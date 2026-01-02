@@ -1159,47 +1159,50 @@ namespace Panosse
             string cheminNouvelExe = Path.Combine(dossierTemp, $"Panosse-{derniereVersionTag}.exe");
             string cheminScriptBatch = Path.Combine(dossierTemp, "PanosseUpdate.bat");
 
-            // Créer un TaskCompletionSource pour attendre la fin du téléchargement
-            var tcs = new TaskCompletionSource<bool>();
-
-            // Télécharger le nouvel exécutable avec WebClient pour avoir la progression
-            using (var webClient = new WebClient())
+            // Vérifier que downloadUrl n'est pas null
+            if (string.IsNullOrEmpty(downloadUrl))
             {
-                webClient.Headers.Add("User-Agent", "Panosse-App");
+                throw new InvalidOperationException("L'URL de téléchargement n'est pas disponible.");
+            }
+
+            // Télécharger le nouvel exécutable avec HttpClient pour avoir la progression
+            using (var httpClient = new HttpClient())
+            {
+                httpClient.DefaultRequestHeaders.Add("User-Agent", "Panosse-App");
+                httpClient.Timeout = TimeSpan.FromMinutes(10); // Timeout de 10 minutes pour les gros fichiers
+
+                // Obtenir la taille totale du fichier
+                var response = await httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
+                response.EnsureSuccessStatusCode();
                 
-                // Événement de progression
-                webClient.DownloadProgressChanged += (s, e) =>
+                var totalBytes = response.Content.Headers.ContentLength ?? 0;
+                
+                // Télécharger avec progression
+                using (var contentStream = await response.Content.ReadAsStreamAsync())
+                using (var fileStream = new FileStream(cheminNouvelExe, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
                 {
-                    // Mettre à jour la barre de progression sur le thread UI
-                    Dispatcher.InvokeAsync(() =>
+                    var buffer = new byte[8192];
+                    long totalBytesRead = 0;
+                    int bytesRead;
+                    
+                    while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
                     {
-                        DownloadProgressBar.Value = e.ProgressPercentage;
-                        UpdateMessage.Text = $"Téléchargement de la mise à jour... {e.ProgressPercentage}%";
-                    });
-                };
-                
-                // Événement de fin de téléchargement
-                webClient.DownloadFileCompleted += (s, e) =>
-                {
-                    if (e.Error != null)
-                    {
-                        tcs.SetException(e.Error);
+                        await fileStream.WriteAsync(buffer, 0, bytesRead);
+                        totalBytesRead += bytesRead;
+                        
+                        if (totalBytes > 0)
+                        {
+                            var progressPercentage = (int)((totalBytesRead * 100) / totalBytes);
+                            
+                            // Mettre à jour la barre de progression sur le thread UI
+                            await Dispatcher.InvokeAsync(() =>
+                            {
+                                DownloadProgressBar.Value = progressPercentage;
+                                UpdateMessage.Text = $"Téléchargement de la mise à jour... {progressPercentage}%";
+                            });
+                        }
                     }
-                    else if (e.Cancelled)
-                    {
-                        tcs.SetCanceled();
-                    }
-                    else
-                    {
-                        tcs.SetResult(true);
-                    }
-                };
-                
-                // Démarrer le téléchargement asynchrone
-                webClient.DownloadFileAsync(new Uri(downloadUrl), cheminNouvelExe);
-                
-                // Attendre la fin du téléchargement
-                await tcs.Task;
+                }
             }
             
             // Masquer la barre de progression et changer le message
@@ -1370,7 +1373,7 @@ REM Supprimer le script lui-même
                 // Note : Le cas "verificationEchouee" est déjà géré plus haut
                 // Plus besoin de ce else final car on gère l'erreur silencieusement
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Erreur inattendue lors du clic sur le bouton
                 // Afficher le bouton avec un message d'erreur
