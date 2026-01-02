@@ -85,7 +85,6 @@ namespace Panosse
         public MainWindow()
         {
             InitializeComponent();
-            InitialiserSystemTray();
             Loaded += MainWindow_Loaded;
             TaskList.ItemsSource = taskMessages;
             
@@ -856,6 +855,9 @@ namespace Panosse
         
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            // Initialiser le System Tray APRÈS que la fenêtre soit complètement chargée
+            InitialiserSystemTray();
+            
             // Enregistrer le raccourci clavier global Ctrl+Alt+P
             EnregistrerHotKey();
             
