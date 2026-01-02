@@ -145,57 +145,117 @@ namespace Panosse
                 ContextMenuStrip = contextMenu
             };
             
-            // Charger l'icône depuis les ressources embarquées
-            try
-            {
-                // Méthode 1 : Essayer de charger depuis les ressources embarquées
-                var iconUri = new Uri("pack://application:,,,/assets/panosse.ico");
-                var streamInfo = System.Windows.Application.GetResourceStream(iconUri);
-                
-                if (streamInfo != null)
-                {
-                    using (var stream = streamInfo.Stream)
-                    {
-                        notifyIcon.Icon = new Drawing.Icon(stream);
-                    }
-                }
-                else
-                {
-                    // Méthode 2 : Essayer de charger depuis le fichier physique (mode Debug)
-                    string iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "panosse.ico");
-                    if (File.Exists(iconPath))
-                    {
-                        notifyIcon.Icon = new Drawing.Icon(iconPath);
-                    }
-                    else
-                    {
-                        // Fallback : utiliser l'icône système
-                        notifyIcon.Icon = Drawing.SystemIcons.Application;
-                        System.Diagnostics.Debug.WriteLine("⚠️ Icône panosse.ico introuvable, utilisation de l'icône système");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // En cas d'erreur, utiliser l'icône système par défaut
-                notifyIcon.Icon = Drawing.SystemIcons.Application;
-                System.Diagnostics.Debug.WriteLine($"⚠️ Erreur chargement icône: {ex.Message}");
-            }
+            // Charger les icônes depuis les ressources embarquées
+            ChargerIcones();
             
             // Double-clic pour afficher la fenêtre
             notifyIcon.DoubleClick += (s, e) => AfficherFenetre();
             
             // Stocker l'icône normale pour pouvoir basculer
-            iconeNormale = notifyIcon.Icon;
-            
-            // Créer l'icône d'alerte (rouge)
-            CreerIconeAlerte();
+            // (déjà fait dans ChargerIcones)
             
             // Démarrer la surveillance du dossier Téléchargements
             DemarrerSurveillanceTelechi();
             
             // Gérer la fermeture de la fenêtre (masquer au lieu de fermer)
             this.Closing += MainWindow_Closing;
+        }
+        
+        /// <summary>
+        /// Charge les deux icônes (propre et sale) depuis les ressources
+        /// </summary>
+        private void ChargerIcones()
+        {
+            try
+            {
+                // Icône PROPRE (normale)
+                var iconPropreUri = new Uri("pack://application:,,,/assets/panosse.ico");
+                var streamPropre = System.Windows.Application.GetResourceStream(iconPropreUri);
+                
+                if (streamPropre != null)
+                {
+                    using (var stream = streamPropre.Stream)
+                    {
+                        // Créer une copie du stream pour éviter qu'il soit fermé
+                        using (var ms = new MemoryStream())
+                        {
+                            stream.CopyTo(ms);
+                            ms.Position = 0;
+                            iconeNormale = new Drawing.Icon(ms);
+                        }
+                    }
+                    notifyIcon.Icon = iconeNormale;
+                    System.Diagnostics.Debug.WriteLine("✅ Icône propre chargée depuis les ressources");
+                }
+                else
+                {
+                    // Fallback : fichier physique
+                    string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "panosse.ico");
+                    if (File.Exists(iconPath))
+                    {
+                        iconeNormale = new Drawing.Icon(iconPath);
+                        notifyIcon.Icon = iconeNormale;
+                        System.Diagnostics.Debug.WriteLine("✅ Icône propre chargée depuis fichier");
+                    }
+                }
+                
+                // Icône SALE (alerte)
+                var iconSaleUri = new Uri("pack://application:,,,/assets/panosse_sale.ico");
+                var streamSale = System.Windows.Application.GetResourceStream(iconSaleUri);
+                
+                if (streamSale != null)
+                {
+                    using (var stream = streamSale.Stream)
+                    {
+                        // Créer une copie du stream
+                        using (var ms = new MemoryStream())
+                        {
+                            stream.CopyTo(ms);
+                            ms.Position = 0;
+                            iconeAlerte = new Drawing.Icon(ms);
+                        }
+                    }
+                    System.Diagnostics.Debug.WriteLine("✅ Icône sale chargée depuis les ressources");
+                }
+                else
+                {
+                    // Fallback : fichier physique
+                    string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "panosse_sale.ico");
+                    if (File.Exists(iconPath))
+                    {
+                        iconeAlerte = new Drawing.Icon(iconPath);
+                        System.Diagnostics.Debug.WriteLine("✅ Icône sale chargée depuis fichier");
+                    }
+                    else
+                    {
+                        // Fallback final : créer une icône rouge dynamiquement
+                        System.Diagnostics.Debug.WriteLine("⚠️ panosse_sale.ico introuvable, création dynamique");
+                        CreerIconeAlerteDynamique();
+                    }
+                }
+                
+                // Si on n'a aucune icône, utiliser l'icône système
+                if (iconeNormale == null)
+                {
+                    iconeNormale = Drawing.SystemIcons.Application;
+                    notifyIcon.Icon = iconeNormale;
+                    System.Diagnostics.Debug.WriteLine("⚠️ Utilisation icône système par défaut");
+                }
+                
+                if (iconeAlerte == null)
+                {
+                    iconeAlerte = Drawing.SystemIcons.Warning;
+                    System.Diagnostics.Debug.WriteLine("⚠️ Utilisation icône Warning système par défaut");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Erreur chargement icônes: {ex.Message}");
+                // Fallback complet
+                iconeNormale = Drawing.SystemIcons.Application;
+                iconeAlerte = Drawing.SystemIcons.Warning;
+                notifyIcon.Icon = iconeNormale;
+            }
         }
         
         /// <summary>
@@ -374,9 +434,9 @@ namespace Panosse
         }
         
         /// <summary>
-        /// Crée l'icône d'alerte (rouge) pour le System Tray
+        /// Crée dynamiquement une icône d'alerte avec un point rouge (fallback)
         /// </summary>
-        private void CreerIconeAlerte()
+        private void CreerIconeAlerteDynamique()
         {
             try
             {
@@ -512,6 +572,41 @@ namespace Panosse
             }
         }
         
+        /// <summary>
+        /// Remet l'icône propre après un nettoyage manuel (Reset Manuel v2.0)
+        /// </summary>
+        private void ResetIconePropre()
+        {
+            if (notifyIcon == null || iconeNormale == null)
+                return;
+            
+            try
+            {
+                // Forcer le retour à l'icône propre
+                dossierTelechargementsEncombre = false;
+                notifyIcon.Icon = iconeNormale;
+                notifyIcon.Text = "Panosse - La serpillère numérique";
+                
+                // Masquer le menu "Pourquoi rouge?"
+                if (contextMenu != null)
+                {
+                    var menuPourquoi = contextMenu.Items.Find("MenuPourquoi", false).FirstOrDefault();
+                    var separatorPourquoi = contextMenu.Items.Find("SeparatorPourquoi", false).FirstOrDefault();
+                    
+                    if (menuPourquoi != null)
+                        menuPourquoi.Visible = false;
+                    if (separatorPourquoi != null)
+                        separatorPourquoi.Visible = false;
+                }
+                
+                System.Diagnostics.Debug.WriteLine("🟢 Icône remise sur PROPRE après nettoyage");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Erreur reset icône: {ex.Message}");
+            }
+        }
+        
         #endregion
         
         /// <summary>
@@ -611,6 +706,9 @@ namespace Panosse
                     
                     // Exécuter toutes les tâches de nettoyage
                     await ExecuterNettoyageCompletSilencieux();
+                    
+                    // Remettre l'icône propre après le nettoyage (Reset Manuel - Mémoire Sélective v2.0)
+                    await Dispatcher.InvokeAsync(() => ResetIconePropre());
                     
                     // Jouer le son de réussite
                     await Dispatcher.InvokeAsync(() => JouerSonReussite());
@@ -1088,6 +1186,9 @@ namespace Panosse
             
             BtnText.Text = "Passer la panosse";
             BtnNettoyer.IsEnabled = true;
+            
+            // Remettre l'icône propre après le nettoyage (Reset Manuel - Mémoire Sélective v2.0)
+            ResetIconePropre();
         }
 
         private async Task<long> ExecuterNettoyageAvecProgression()
