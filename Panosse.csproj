@@ -29,10 +29,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Ressources embarquées (incluses dans l'exécutable) -->
     <Resource Include="assets\panosse.png" />
     <Resource Include="assets\panosse.ico" />
     <Resource Include="assets\panosse_sale.ico" />
     <Resource Include="assets\panosse_sale.png" />
+    
+    <!-- Fichiers de contenu (copiés en fallback pour mode Debug) -->
+    <Content Include="assets\panosse.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="assets\panosse_sale.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
