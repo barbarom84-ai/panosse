@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'  # Déclenche sur tous les tags commençant par 'v' (ex: v1.0.0, v1.1.0, etc.)
 
+permissions:
+  contents: write  # Nécessaire pour créer des releases
+
 jobs:
   build-and-release:
     runs-on: windows-latest
@@ -42,7 +45,7 @@ jobs:
       run: |
         $version = "${{ github.ref_name }}"
         Move-Item -Path "publish\Panosse.exe" -Destination "publish\Panosse-$version.exe"
-        Write-Host "Fichier renomme en Panosse-$version.exe"
+        Write-Host "Fichier renommé en Panosse-$version.exe"
         
     # 6. Calculer le checksum SHA256
     - name: Calculate SHA256
@@ -52,76 +55,71 @@ jobs:
         $hash = (Get-FileHash -Path "publish\Panosse-$version.exe" -Algorithm SHA256).Hash
         echo "sha256=$hash" >> $env:GITHUB_OUTPUT
         Write-Host "SHA256: $hash"
+        # Créer un fichier de checksums
+        echo "$hash  Panosse-$version.exe" > publish\SHA256SUMS.txt
         
-    # 7. Créer la GitHub Release
+    # 7. Créer la GitHub Release avec gh CLI
     - name: Create GitHub Release
-      id: create_release
-      uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref_name }}
-        release_name: Panosse ${{ github.ref_name }}
-        body: |
-          ## 🧹 Panosse ${{ github.ref_name }}
-          
-          **La serpillère numérique pour un PC tout propre !**
-          
-          ### 📦 Installation
-          
-          Téléchargez `Panosse-${{ github.ref_name }}.exe` ci-dessous et lancez-le.
-          
-          **Aucune installation requise** - Version portable complète.
-          
-          ### ✨ Fonctionnalités
-          
-          - 🗑️ Vidage de la corbeille
-          - 🧹 Nettoyage fichiers temporaires
-          - 🌐 Cache navigateurs (Chrome, Firefox, Edge)
-          - 📋 Nettoyage registre (RunMRU, RecentDocs)
-          - 📥 Suppression .exe/.msi anciens (Téléchargements)
-          - 📄 Nettoyage logs Windows
-          - 🖼️ Cache miniatures
-          - 📊 Progression détaillée avec animations
-          
-          ### ⚠️ Prérequis
-          
-          - **Windows 10/11** (64-bit)
-          - **Droits administrateur** (certaines fonctions)
-          - **.NET 8.0** inclus (self-contained)
-          
-          ### 🔐 Checksum SHA256
-          
-          ```
-          ${{ steps.checksum.outputs.sha256 }}
-          ```
-          
-          ### 🐛 Signaler un bug
-          
-          Ouvrez une issue : https://github.com/${{ github.repository }}/issues
-          
-          ---
-          
-          **Compilé automatiquement par GitHub Actions** 🤖
-        draft: false
-        prerelease: false
+      run: |
+        $version = "${{ github.ref_name }}"
+        $body = @"
+        ## 🧹 Panosse $version
         
-    # 8. Uploader l'exécutable en tant qu'asset
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: publish/Panosse-${{ github.ref_name }}.exe
-        asset_name: Panosse-${{ github.ref_name }}.exe
-        asset_content_type: application/vnd.microsoft.portable-executable
+        **La serpillère numérique pour un PC tout propre !**
         
-    # 9. Afficher un résumé
+        ### 📦 Installation
+        
+        Téléchargez ``Panosse-$version.exe`` ci-dessous et lancez-le.
+        
+        **Aucune installation requise** - Version portable complète.
+        
+        ### ✨ Fonctionnalités
+        
+        - 🗑️ Vidage de la corbeille
+        - 🧹 Nettoyage fichiers temporaires
+        - 🌐 Cache navigateurs (Chrome, Firefox, Edge)
+        - 📋 Nettoyage registre (RunMRU, RecentDocs)
+        - 📥 Suppression .exe/.msi anciens (Téléchargements)
+        - 📄 Nettoyage logs Windows
+        - 🖼️ Cache miniatures
+        - 📊 Progression détaillée avec animations
+        - 🔄 Mise à jour automatique
+        
+        ### ⚠️ Prérequis
+        
+        - **Windows 10/11** (64-bit)
+        - **Droits administrateur** (certaines fonctions)
+        - **.NET 8.0** inclus (self-contained)
+        
+        ### 🔐 Checksum SHA256
+        
+        ``````
+        ${{ steps.checksum.outputs.sha256 }}
+        ``````
+        
+        ### 🐛 Signaler un bug
+        
+        Ouvrez une issue : https://github.com/${{ github.repository }}/issues
+        
+        ---
+        
+        **Compilé automatiquement par GitHub Actions** 🤖
+        "@
+        
+        # Créer la release avec gh CLI
+        gh release create $version `
+          --title "Panosse $version" `
+          --notes $body `
+          publish\Panosse-$version.exe `
+          publish\SHA256SUMS.txt
+        
+    # 8. Afficher un résumé
     - name: Build Summary
       run: |
         Write-Host "================================" -ForegroundColor Green
-        Write-Host "BUILD REUSSI !" -ForegroundColor Green
+        Write-Host "BUILD RÉUSSI !" -ForegroundColor Green
         Write-Host "================================" -ForegroundColor Green
         Write-Host ""
         Write-Host "Version: ${{ github.ref_name }}" -ForegroundColor Cyan
@@ -130,4 +128,3 @@ jobs:
         Write-Host ""
         Write-Host "Release disponible sur:" -ForegroundColor Yellow
         Write-Host "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}" -ForegroundColor Blue
-
