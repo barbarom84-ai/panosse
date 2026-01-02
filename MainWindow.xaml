@@ -416,7 +416,7 @@
                     <TextBlock x:Name="LinkGitHub"
                                HorizontalAlignment="Center"
                                Margin="0,0,0,20">
-                        <Hyperlink NavigateUri="https://github.com/votre-nom/panosse"
+                        <Hyperlink NavigateUri="https://github.com/barbarom84-ai/panosse"
                                    RequestNavigate="Hyperlink_RequestNavigate"
                                    Foreground="#2196F3"
                                    TextDecorations="None">

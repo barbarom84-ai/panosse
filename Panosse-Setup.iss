@@ -5,7 +5,7 @@
 #define MyAppName "Panosse"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "Panosse"
-#define MyAppURL "https://github.com/votre-nom/panosse"
+#define MyAppURL "https://github.com/barbarom84-ai/panosse"
 #define MyAppExeName "Panosse.exe"
 #define MyAppIconFile "assets\panosse.ico"
 

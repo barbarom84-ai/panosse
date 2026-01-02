@@ -88,7 +88,7 @@ Téléchargez simplement `Panosse.exe` (74 Mo) et lancez-le.
 
 ```powershell
 # Clone du dépôt
-git clone https://github.com/votre-nom/panosse.git
+git clone https://github.com/barbarom84-ai/panosse.git
 cd panosse
 
 # Compilation en mode Debug
