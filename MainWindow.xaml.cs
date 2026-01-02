@@ -877,7 +877,7 @@ namespace Panosse
                     client.Timeout = TimeSpan.FromSeconds(10);
                     
                     // Ajouter un User-Agent (requis par l'API GitHub)
-                    client.DefaultRequestHeaders.Add("User-Agent", "Panosse-App");
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd("Panosse-App/1.0");
                     
                     // URL de l'API GitHub pour la dernière release
                     string apiUrl = $"https://api.github.com/repos/{GITHUB_REPO}/releases/latest";
