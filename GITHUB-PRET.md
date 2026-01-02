@@ -2,7 +2,7 @@
 
 ## ✅ Ce qui a été fait
 
-1. ✅ **Remote ajouté** : `origin` → `https://github.com/marco-panosse/Panosse.git`
+1. ✅ **Remote ajouté** : `origin` → `https://github.com/barbarom84-ai/panosse.git`
 2. ✅ **Branche renommée** : `master` → `main`
 3. ✅ Tout est prêt pour le push !
 
@@ -29,7 +29,7 @@
 
 ## 🔄 Changer le nom d'utilisateur (si nécessaire)
 
-Si votre nom d'utilisateur GitHub n'est **pas** `marco-panosse`, changez-le :
+Si vous avez besoin de changer l'URL du remote :
 
 ```powershell
 cd "C:\Users\marco\Cursor Workplace\panosse"
@@ -90,7 +90,7 @@ Windows enregistrera vos identifiants pour les prochaines fois.
 ## ✅ Après le push
 
 Vérifiez sur GitHub :
-- https://github.com/marco-panosse/Panosse (ou votre URL)
+- https://github.com/barbarom84-ai/panosse
 
 Vous devriez voir :
 - ✅ Tous vos fichiers
