@@ -124,7 +124,8 @@
             <MenuItem Header="📁 _Fichier" FontSize="12" Padding="10,5">
                 <MenuItem Header="🔄 _Actualiser la détection" Click="MenuItem_Actualiser_Click" />
                 <Separator />
-                <MenuItem Header="❌ _Quitter" Click="BtnQuitter_Click" InputGestureText="Alt+F4"/>
+                <MenuItem Header="🗕 _Réduire dans la barre des tâches" Click="BtnQuitter_Click" InputGestureText="Échap"/>
+                <MenuItem Header="❌ _Quitter définitivement" Click="MenuItem_QuitterDefinitivement_Click" InputGestureText="Alt+F4"/>
             </MenuItem>
             
             <!-- Menu Outils -->

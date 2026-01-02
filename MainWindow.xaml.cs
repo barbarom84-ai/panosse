@@ -15,6 +15,8 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using Microsoft.Win32;
+using Forms = System.Windows.Forms;
+using Drawing = System.Drawing;
 
 namespace Panosse
 {
@@ -43,10 +45,15 @@ namespace Panosse
         
         // Navigateurs en cours d'exécution
         private System.Collections.Generic.List<string> navigateursEnCours = new System.Collections.Generic.List<string>();
+        
+        // System Tray Icon
+        private Forms.NotifyIcon? notifyIcon;
+        private Forms.ContextMenuStrip? contextMenu;
 
         public MainWindow()
         {
             InitializeComponent();
+            InitialiserSystemTray();
             Loaded += MainWindow_Loaded;
             TaskList.ItemsSource = taskMessages;
             
@@ -54,6 +61,127 @@ namespace Panosse
             VersionText.Text = $"v{VERSION_ACTUELLE}";
         }
 
+        /// <summary>
+        /// Initialise l'icône dans le System Tray (barre des tâches)
+        /// </summary>
+        private void InitialiserSystemTray()
+        {
+            // Créer le menu contextuel
+            contextMenu = new Forms.ContextMenuStrip();
+            
+            // Menu "Ouvrir Panosse"
+            var menuOuvrir = new Forms.ToolStripMenuItem("🪟 Ouvrir Panosse");
+            menuOuvrir.Click += (s, e) => AfficherFenetre();
+            contextMenu.Items.Add(menuOuvrir);
+            
+            // Menu "Passer la panosse maintenant"
+            var menuNettoyer = new Forms.ToolStripMenuItem("🧹 Passer la panosse maintenant");
+            menuNettoyer.Click += (s, e) => 
+            {
+                AfficherFenetre();
+                // Simuler un clic sur le bouton de nettoyage
+                Dispatcher.Invoke(() => BtnNettoyer_Click(null!, null!));
+            };
+            contextMenu.Items.Add(menuNettoyer);
+            
+            // Séparateur
+            contextMenu.Items.Add(new Forms.ToolStripSeparator());
+            
+            // Menu "Quitter"
+            var menuQuitter = new Forms.ToolStripMenuItem("❌ Quitter");
+            menuQuitter.Click += (s, e) => QuitterApplication();
+            contextMenu.Items.Add(menuQuitter);
+            
+            // Créer l'icône dans le System Tray
+            notifyIcon = new Forms.NotifyIcon
+            {
+                Text = "Panosse - La serpillère numérique",
+                Visible = true,
+                ContextMenuStrip = contextMenu
+            };
+            
+            // Charger l'icône depuis les ressources
+            try
+            {
+                // Charger l'icône .ico depuis le dossier assets
+                string iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "panosse.ico");
+                if (File.Exists(iconPath))
+                {
+                    notifyIcon.Icon = new Drawing.Icon(iconPath);
+                }
+                else
+                {
+                    // Fallback : utiliser l'icône système
+                    notifyIcon.Icon = Drawing.SystemIcons.Application;
+                }
+            }
+            catch
+            {
+                // En cas d'erreur, utiliser l'icône système par défaut
+                notifyIcon.Icon = Drawing.SystemIcons.Application;
+            }
+            
+            // Double-clic pour afficher la fenêtre
+            notifyIcon.DoubleClick += (s, e) => AfficherFenetre();
+            
+            // Gérer la fermeture de la fenêtre (masquer au lieu de fermer)
+            this.Closing += MainWindow_Closing;
+        }
+        
+        /// <summary>
+        /// Affiche la fenêtre principale et la met au premier plan
+        /// </summary>
+        private void AfficherFenetre()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                this.Show();
+                this.WindowState = WindowState.Normal;
+                this.Activate();
+                this.Focus();
+            });
+        }
+        
+        /// <summary>
+        /// Quitte vraiment l'application (pas seulement masquer)
+        /// </summary>
+        private void QuitterApplication()
+        {
+            // Nettoyer l'icône du System Tray
+            if (notifyIcon != null)
+            {
+                notifyIcon.Visible = false;
+                notifyIcon.Dispose();
+                notifyIcon = null;
+            }
+            
+            // Fermer l'application
+            Dispatcher.Invoke(() => System.Windows.Application.Current.Shutdown());
+        }
+        
+        /// <summary>
+        /// Intercepte la fermeture de la fenêtre pour la masquer au lieu de la fermer
+        /// </summary>
+        private void MainWindow_Closing(object? sender, CancelEventArgs e)
+        {
+            // Annuler la fermeture
+            e.Cancel = true;
+            
+            // Masquer la fenêtre au lieu de la fermer
+            this.Hide();
+            
+            // Afficher une notification (optionnel)
+            if (notifyIcon != null)
+            {
+                notifyIcon.ShowBalloonTip(
+                    2000,
+                    "Panosse",
+                    "Panosse est toujours actif dans la barre des tâches. Double-cliquez sur l'icône pour le réouvrir.",
+                    Forms.ToolTipIcon.Info
+                );
+            }
+        }
+        
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             // Vérifier si Chrome ou Edge sont ouverts
@@ -231,7 +359,19 @@ namespace Panosse
 
         private void BtnQuitter_Click(object sender, RoutedEventArgs e)
         {
-            Application.Current.Shutdown();
+            // Masquer la fenêtre au lieu de fermer l'application
+            this.Hide();
+            
+            // Afficher une notification
+            if (notifyIcon != null)
+            {
+                notifyIcon.ShowBalloonTip(
+                    2000,
+                    "Panosse",
+                    "Panosse est toujours actif dans la barre des tâches. Double-cliquez sur l'icône pour le réouvrir.",
+                    Forms.ToolTipIcon.Info
+                );
+            }
         }
 
         private void BtnAPropos_Click(object sender, RoutedEventArgs e)
@@ -239,6 +379,14 @@ namespace Panosse
             // Afficher l'overlay "À propos" avec animation
             OverlayAPropos.Visibility = Visibility.Visible;
             AnimerApparitionOverlay();
+        }
+        
+        /// <summary>
+        /// Gestionnaire pour le menu "Quitter définitivement"
+        /// </summary>
+        private void MenuItem_QuitterDefinitivement_Click(object sender, RoutedEventArgs e)
+        {
+            QuitterApplication();
         }
         
         /// <summary>
