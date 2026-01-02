@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>assets\panosse.ico</ApplicationIcon>
+    
+    <!-- Configuration pour la publication -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    
+    <!-- Informations de version -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Company>Panosse</Company>
+    <Product>Panosse - Nettoyeur PC</Product>
+    <Copyright>Copyright © 2025</Copyright>
+    <Description>Application de nettoyage automatique pour Windows</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="assets\panosse.png" />
+    <Resource Include="assets\panosse.ico" />
+  </ItemGroup>
+
+</Project>
+

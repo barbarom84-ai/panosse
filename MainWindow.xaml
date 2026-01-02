@@ -1,0 +1,345 @@
+<Window x:Class="Panosse.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Panosse" 
+        Height="550" 
+        Width="400"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        Icon="assets/panosse.ico"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown">
+
+    <Window.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#F5F5F5" Offset="0"/>
+            <GradientStop Color="#FFFFFF" Offset="1"/>
+        </LinearGradientBrush>
+    </Window.Background>
+
+    <Window.Resources>
+        <!-- Animation de pulsation -->
+        <Storyboard x:Key="PulseAnimation" RepeatBehavior="Forever">
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)">
+                <EasingDoubleKeyFrame KeyTime="0:0:0.0" Value="1.0"/>
+                <EasingDoubleKeyFrame KeyTime="0:0:0.5" Value="1.1"/>
+                <EasingDoubleKeyFrame KeyTime="0:0:1.0" Value="1.0"/>
+            </DoubleAnimationUsingKeyFrames>
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)">
+                <EasingDoubleKeyFrame KeyTime="0:0:0.0" Value="1.0"/>
+                <EasingDoubleKeyFrame KeyTime="0:0:0.5" Value="1.1"/>
+                <EasingDoubleKeyFrame KeyTime="0:0:1.0" Value="1.0"/>
+            </DoubleAnimationUsingKeyFrames>
+        </Storyboard>
+
+        <!-- Style pour le bouton circulaire bleu -->
+        <Style x:Key="CircleButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#2196F3"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Ellipse x:Name="ellipse" Fill="{TemplateBinding Background}">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect BlurRadius="25" ShadowDepth="8" Opacity="0.4" Color="#2196F3"/>
+                                </Ellipse.Effect>
+                            </Ellipse>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ellipse" Property="Fill" Value="#42A5F5"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ellipse" Property="Fill" Value="#1976D2"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ellipse" Property="Fill" Value="#BDBDBD"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Style pour le bouton Quitter -->
+        <Style x:Key="CloseButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#757575"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="15"
+                                Width="30" Height="30">
+                            <TextBlock Text="×" 
+                                       FontSize="24" 
+                                       Foreground="{TemplateBinding Foreground}"
+                                       HorizontalAlignment="Center" 
+                                       VerticalAlignment="Center"
+                                       Margin="0,-3,0,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#FFEBEE"/>
+                                <Setter Property="Foreground" Value="#F44336"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Style pour la barre de progression -->
+        <Style x:Key="ModernProgressBar" TargetType="ProgressBar">
+            <Setter Property="Background" Value="#E0E0E0"/>
+            <Setter Property="Foreground" Value="#2196F3"/>
+            <Setter Property="Height" Value="6"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <!-- Bouton Quitter en haut à droite -->
+        <Button x:Name="BtnQuitter" 
+                Style="{StaticResource CloseButtonStyle}"
+                HorizontalAlignment="Right" 
+                VerticalAlignment="Top" 
+                Margin="0,10,10,0"
+                Click="BtnQuitter_Click"/>
+
+        <!-- Bouton À propos en bas à gauche -->
+        <Button x:Name="BtnAPropos"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"
+                Margin="15,0,0,15"
+                Background="Transparent"
+                BorderThickness="0"
+                Cursor="Hand"
+                Click="BtnAPropos_Click"
+                ToolTip="À propos de Panosse">
+            <TextBlock Text="ℹ️" FontSize="20" Opacity="0.6"/>
+        </Button>
+
+        <!-- Titre -->
+        <TextBlock Text="Panosse" 
+                   FontSize="36" 
+                   FontWeight="Light" 
+                   Foreground="#424242" 
+                   HorizontalAlignment="Center" 
+                   VerticalAlignment="Top" 
+                   Margin="0,30,0,0"/>
+
+        <!-- Zone centrale -->
+        <StackPanel HorizontalAlignment="Center" 
+                    VerticalAlignment="Center"
+                    Margin="0,-30,0,0">
+            
+            <!-- Bouton circulaire avec icône -->
+            <Button x:Name="BtnNettoyer" 
+                    Style="{StaticResource CircleButtonStyle}" 
+                    Width="150" 
+                    Height="150"
+                    Click="BtnNettoyer_Click"
+                    RenderTransformOrigin="0.5,0.5">
+                <Button.RenderTransform>
+                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                </Button.RenderTransform>
+                <Grid>
+                    <!-- Image panosse.png -->
+                    <Image Source="assets/panosse.png" 
+                           Width="80" 
+                           Height="80"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                </Grid>
+            </Button>
+
+            <!-- Texte sous le bouton -->
+            <TextBlock x:Name="BtnText"
+                       Text="Passer la panosse" 
+                       FontSize="18" 
+                       FontWeight="SemiBold"
+                       Foreground="#424242" 
+                       HorizontalAlignment="Center" 
+                       Margin="0,20,0,0"/>
+        </StackPanel>
+
+        <!-- Zone de statut en bas -->
+        <StackPanel VerticalAlignment="Bottom" Margin="30,0,30,30">
+            <!-- Barre de progression -->
+            <ProgressBar x:Name="PrgBar" 
+                         Style="{StaticResource ModernProgressBar}"
+                         Minimum="0" 
+                         Maximum="100" 
+                         Value="0" 
+                         Visibility="Collapsed"
+                         Margin="0,0,0,10"/>
+
+            <!-- Liste des tâches -->
+            <ScrollViewer x:Name="TaskScrollViewer"
+                          MaxHeight="100"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Visibility="Collapsed"
+                          Opacity="0"
+                          Margin="0,0,0,10">
+                <ItemsControl x:Name="TaskList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" 
+                                       FontSize="11" 
+                                       Foreground="#9E9E9E"
+                                       TextWrapping="Wrap"
+                                       Margin="0,1,0,1"
+                                       Opacity="0.9"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Message de statut -->
+            <TextBlock x:Name="StatusText" 
+                       Text="" 
+                       FontSize="14" 
+                       Foreground="#757575" 
+                       TextAlignment="Center" 
+                       TextWrapping="Wrap"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Overlay "À propos" -->
+        <Grid x:Name="OverlayAPropos"
+              Background="#CC000000"
+              Visibility="Collapsed"
+              Opacity="0"
+              MouseLeftButtonDown="OverlayAPropos_MouseDown">
+            
+            <!-- Panneau À propos -->
+            <Border Background="White"
+                    CornerRadius="15"
+                    Width="320"
+                    MaxHeight="400"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Padding="30,25,30,25">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.3"/>
+                </Border.Effect>
+                
+                <StackPanel>
+                    <!-- Logo et nom -->
+                    <Image Source="assets/panosse.png"
+                           Width="60"
+                           Height="60"
+                           Margin="0,0,0,15"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                    
+                    <TextBlock Text="Panosse"
+                               FontSize="28"
+                               FontWeight="Bold"
+                               Foreground="#2196F3"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,5"/>
+                    
+                    <TextBlock Text="v1.0.0"
+                               FontSize="14"
+                               Foreground="#9E9E9E"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,20"/>
+                    
+                    <!-- Slogan -->
+                    <TextBlock Text="La serpillère numérique"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="#424242"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,5"/>
+                    
+                    <TextBlock Text="pour un PC tout propre"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="#424242"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,25"/>
+                    
+                    <!-- Séparateur -->
+                    <Border Height="1"
+                            Background="#E0E0E0"
+                            Margin="0,0,0,20"/>
+                    
+                    <!-- Développeur -->
+                    <TextBlock Text="Développé par"
+                               FontSize="12"
+                               Foreground="#9E9E9E"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,5"/>
+                    
+                    <TextBlock Text="Marco"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="#424242"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,15"/>
+                    
+                    <!-- Lien GitHub -->
+                    <TextBlock x:Name="LinkGitHub"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,25">
+                        <Hyperlink NavigateUri="https://github.com/votre-nom/panosse"
+                                   RequestNavigate="Hyperlink_RequestNavigate"
+                                   Foreground="#2196F3"
+                                   TextDecorations="None">
+                            <Run Text="🔗 GitHub"/>
+                        </Hyperlink>
+                    </TextBlock>
+                    
+                    <!-- Bouton Retour -->
+                    <Button Content="Retour"
+                            Click="BtnRetourAPropos_Click"
+                            Background="#2196F3"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Padding="30,10"
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Cursor="Hand"
+                            HorizontalAlignment="Center">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="#2196F3"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="8"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#42A5F5"/>
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter Property="Background" Value="#1976D2"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
