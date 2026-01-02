@@ -25,11 +25,32 @@ namespace Panosse
         // Import pour vider la corbeille nativement
         [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
         static extern int SHEmptyRecycleBin(IntPtr hwnd, string rootPath, uint flags);
+        
+        // Imports pour RegisterHotKey (raccourci clavier global)
+        [DllImport("user32.dll")]
+        private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+        
+        [DllImport("user32.dll")]
+        private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+        
+        // Constantes pour le HotKey
+        private const int HOTKEY_ID = 9000;
+        private const uint MOD_CONTROL = 0x0002;
+        private const uint MOD_ALT = 0x0001;
+        private const uint VK_P = 0x50; // Touche 'P'
+        private const int WM_HOTKEY = 0x0312;
+        
+        // Handle pour la fenêtre (nécessaire pour RegisterHotKey)
+        private IntPtr windowHandle;
+        private System.Windows.Interop.HwndSource? hwndSource;
 
         private Storyboard? pulseStoryboard;
         private ObservableCollection<string> taskMessages = new ObservableCollection<string>();
         private int etapesCourantes = 0;
         private int etapesTotales = 8;
+        
+        // Statistiques de nettoyage
+        private long espaceLibereMo = 0;
         
         // Version actuelle de l'application (lue automatiquement depuis le .csproj)
         private static readonly string VERSION_ACTUELLE = 
@@ -147,6 +168,9 @@ namespace Panosse
         /// </summary>
         private void QuitterApplication()
         {
+            // Désenregistrer le HotKey
+            DesenregistrerHotKey();
+            
             // Nettoyer l'icône du System Tray
             if (notifyIcon != null)
             {
@@ -182,8 +206,241 @@ namespace Panosse
             }
         }
         
+        /// <summary>
+        /// Enregistre le raccourci clavier global Ctrl+Alt+P
+        /// </summary>
+        private void EnregistrerHotKey()
+        {
+            try
+            {
+                // Obtenir le handle de la fenêtre
+                var helper = new System.Windows.Interop.WindowInteropHelper(this);
+                windowHandle = helper.Handle;
+                
+                // Créer le HwndSource pour intercepter les messages Windows
+                hwndSource = System.Windows.Interop.HwndSource.FromHwnd(windowHandle);
+                if (hwndSource != null)
+                {
+                    hwndSource.AddHook(WndProc);
+                }
+                
+                // Enregistrer le HotKey : Ctrl+Alt+P
+                bool success = RegisterHotKey(windowHandle, HOTKEY_ID, MOD_CONTROL | MOD_ALT, VK_P);
+                
+                if (success)
+                {
+                    System.Diagnostics.Debug.WriteLine("✅ Raccourci Ctrl+Alt+P enregistré avec succès");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("❌ Échec de l'enregistrement du raccourci");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Erreur lors de l'enregistrement du HotKey: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Désenregistre le raccourci clavier global
+        /// </summary>
+        private void DesenregistrerHotKey()
+        {
+            try
+            {
+                if (windowHandle != IntPtr.Zero)
+                {
+                    UnregisterHotKey(windowHandle, HOTKEY_ID);
+                }
+                
+                if (hwndSource != null)
+                {
+                    hwndSource.RemoveHook(WndProc);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Erreur lors du désenregistrement du HotKey: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Gestionnaire de messages Windows pour intercepter le HotKey
+        /// </summary>
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            // Vérifier si c'est un message WM_HOTKEY
+            if (msg == WM_HOTKEY)
+            {
+                int id = wParam.ToInt32();
+                
+                // Vérifier si c'est notre HotKey (Ctrl+Alt+P)
+                if (id == HOTKEY_ID)
+                {
+                    handled = true;
+                    
+                    // Lancer le nettoyage en arrière-plan
+                    System.Diagnostics.Debug.WriteLine("🔥 Ctrl+Alt+P détecté ! Lancement du nettoyage en arrière-plan...");
+                    LancerNettoyageArrierePlan();
+                }
+            }
+            
+            return IntPtr.Zero;
+        }
+        
+        /// <summary>
+        /// Lance le nettoyage complet en arrière-plan sans afficher la fenêtre
+        /// </summary>
+        private async void LancerNettoyageArrierePlan()
+        {
+            await Task.Run(async () =>
+            {
+                try
+                {
+                    // Réinitialiser l'espace libéré
+                    espaceLibereMo = 0;
+                    
+                    // Exécuter toutes les tâches de nettoyage
+                    await ExecuterNettoyageCompletSilencieux();
+                    
+                    // Jouer le son de réussite
+                    await Dispatcher.InvokeAsync(() => JouerSonReussite());
+                    
+                    // Afficher la notification Toast
+                    await Dispatcher.InvokeAsync(() => AfficherNotificationToast());
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"❌ Erreur pendant le nettoyage en arrière-plan: {ex.Message}");
+                }
+            });
+        }
+        
+        /// <summary>
+        /// Exécute le nettoyage complet en mode silencieux (sans UI)
+        /// </summary>
+        private async Task ExecuterNettoyageCompletSilencieux()
+        {
+            long tailleTotal = 0;
+            
+            try
+            {
+                // 1. Vider la corbeille
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        SHEmptyRecycleBin(IntPtr.Zero, string.Empty, 1 | 2 | 4);
+                    }
+                    catch { }
+                });
+                
+                // 2. Nettoyer les fichiers temporaires
+                tailleTotal += await Task.Run(() =>
+                {
+                    long size = 0;
+                    size += NettoyerDossier(Path.GetTempPath());
+                    size += NettoyerDossier(@"C:\Windows\Temp");
+                    return size;
+                });
+                
+                // 3. Cache Chrome
+                tailleTotal += await Task.Run(() =>
+                {
+                    long size = 0;
+                    string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                    size += NettoyerDossier(Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Cache"));
+                    size += NettoyerDossier(Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Cache\Cache_Data"));
+                    size += NettoyerDossier(Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Code Cache"));
+                    return size;
+                });
+                
+                // 4. Cache Edge
+                tailleTotal += await Task.Run(() =>
+                {
+                    long size = 0;
+                    string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                    size += NettoyerDossier(Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Cache"));
+                    size += NettoyerDossier(Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Cache\Cache_Data"));
+                    size += NettoyerDossier(Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Code Cache"));
+                    return size;
+                });
+                
+                // 5. Nettoyer le registre
+                await Task.Run(() => NettoyerRegistre());
+                
+                // 6. Nettoyer les téléchargements
+                tailleTotal += await Task.Run(() => NettoyerTelechargements());
+                
+                // 7. Nettoyer les logs Windows
+                tailleTotal += await Task.Run(() => NettoyerLogsWindows());
+                
+                // 8. Nettoyer le cache des miniatures
+                tailleTotal += await Task.Run(() => NettoyerCacheMiniatures());
+                
+                // Convertir en Mo
+                espaceLibereMo = tailleTotal / (1024 * 1024);
+                
+                System.Diagnostics.Debug.WriteLine($"✅ Nettoyage terminé : {espaceLibereMo} Mo libérés");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Erreur pendant le nettoyage: {ex.Message}");
+                // En cas d'erreur, on met une valeur minimale
+                espaceLibereMo = 0;
+            }
+        }
+        
+        /// <summary>
+        /// Joue le son de réussite système
+        /// </summary>
+        private void JouerSonReussite()
+        {
+            try
+            {
+                // Jouer le son "Asterisk" de Windows (son de succès)
+                System.Media.SystemSounds.Asterisk.Play();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Impossible de jouer le son: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Affiche une notification Toast Windows
+        /// </summary>
+        private void AfficherNotificationToast()
+        {
+            try
+            {
+                if (notifyIcon != null)
+                {
+                    // Utiliser BalloonTip pour simuler une notification Toast
+                    string message = espaceLibereMo > 0
+                        ? $"Panosse a fini son travail : {espaceLibereMo} Mo libérés ! 🧹✨"
+                        : "Panosse a fini son travail : PC nettoyé ! 🧹✨";
+                    
+                    notifyIcon.ShowBalloonTip(
+                        5000, // 5 secondes
+                        "✅ Nettoyage terminé",
+                        message,
+                        Forms.ToolTipIcon.Info
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Impossible d'afficher la notification: {ex.Message}");
+            }
+        }
+        
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            // Enregistrer le raccourci clavier global Ctrl+Alt+P
+            EnregistrerHotKey();
+            
             // Vérifier si Chrome ou Edge sont ouverts
             navigateursEnCours = CheckRunningBrowsers();
             if (navigateursEnCours.Count > 0)
