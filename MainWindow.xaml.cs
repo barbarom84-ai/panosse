@@ -1,8 +1,10 @@
 using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -1093,16 +1095,23 @@ namespace Panosse
 
             try
             {
-                // Désactiver le bouton pendant le téléchargement
+                // Désactiver le bouton et fermer pendant le téléchargement
                 BtnMettreAJour.IsEnabled = false;
                 BtnFermerUpdate.IsEnabled = false;
-                UpdateMessage.Text = "Téléchargement en cours...";
+                
+                // Changer le message et afficher la barre de progression
+                UpdateMessage.Text = "Téléchargement de la mise à jour...";
+                DownloadProgressBar.Visibility = Visibility.Visible;
+                DownloadProgressBar.Value = 0;
 
-                // Télécharger la nouvelle version
+                // Télécharger la nouvelle version avec progression
                 await TelechargerEtInstallerMiseAJour();
             }
             catch (Exception ex)
             {
+                // Masquer la barre de progression
+                DownloadProgressBar.Visibility = Visibility.Collapsed;
+                
                 // En cas d'erreur, afficher un message et proposer le téléchargement manuel
                 var result = MessageBox.Show(
                     $"Impossible de télécharger automatiquement la mise à jour.\n\n" +
@@ -1134,7 +1143,7 @@ namespace Panosse
         }
 
         /// <summary>
-        /// Télécharge et installe la mise à jour automatiquement
+        /// Télécharge et installe la mise à jour automatiquement avec progression
         /// </summary>
         private async Task TelechargerEtInstallerMiseAJour()
         {
@@ -1150,18 +1159,55 @@ namespace Panosse
             string cheminNouvelExe = Path.Combine(dossierTemp, $"Panosse-{derniereVersionTag}.exe");
             string cheminScriptBatch = Path.Combine(dossierTemp, "PanosseUpdate.bat");
 
-            // Télécharger le nouvel exécutable
-            using (var client = new HttpClient())
+            // Créer un TaskCompletionSource pour attendre la fin du téléchargement
+            var tcs = new TaskCompletionSource<bool>();
+
+            // Télécharger le nouvel exécutable avec WebClient pour avoir la progression
+            using (var webClient = new WebClient())
             {
-                client.DefaultRequestHeaders.Add("User-Agent", "Panosse-App");
+                webClient.Headers.Add("User-Agent", "Panosse-App");
                 
-                // Télécharger avec progression (optionnel : on pourrait ajouter une barre de progression)
-                var response = await client.GetAsync(downloadUrl);
-                response.EnsureSuccessStatusCode();
+                // Événement de progression
+                webClient.DownloadProgressChanged += (s, e) =>
+                {
+                    // Mettre à jour la barre de progression sur le thread UI
+                    Dispatcher.InvokeAsync(() =>
+                    {
+                        DownloadProgressBar.Value = e.ProgressPercentage;
+                        UpdateMessage.Text = $"Téléchargement de la mise à jour... {e.ProgressPercentage}%";
+                    });
+                };
                 
-                var bytes = await response.Content.ReadAsByteArrayAsync();
-                await File.WriteAllBytesAsync(cheminNouvelExe, bytes);
+                // Événement de fin de téléchargement
+                webClient.DownloadFileCompleted += (s, e) =>
+                {
+                    if (e.Error != null)
+                    {
+                        tcs.SetException(e.Error);
+                    }
+                    else if (e.Cancelled)
+                    {
+                        tcs.SetCanceled();
+                    }
+                    else
+                    {
+                        tcs.SetResult(true);
+                    }
+                };
+                
+                // Démarrer le téléchargement asynchrone
+                webClient.DownloadFileAsync(new Uri(downloadUrl), cheminNouvelExe);
+                
+                // Attendre la fin du téléchargement
+                await tcs.Task;
             }
+            
+            // Masquer la barre de progression et changer le message
+            await Dispatcher.InvokeAsync(() =>
+            {
+                DownloadProgressBar.Visibility = Visibility.Collapsed;
+                UpdateMessage.Text = "Installation en cours...";
+            });
 
             // Créer le script batch de mise à jour
             string scriptBatch = $@"@echo off
