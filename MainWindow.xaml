@@ -334,7 +334,9 @@
                        Foreground="#757575" 
                        TextAlignment="Center" 
                        TextWrapping="Wrap"
-                       HorizontalAlignment="Center"/>
+                       HorizontalAlignment="Center"
+                       MouseLeftButtonDown="StatusText_MouseLeftButtonDown"
+                       Cursor="Arrow"/>
         </StackPanel>
 
         <!-- Overlay "À propos" -->

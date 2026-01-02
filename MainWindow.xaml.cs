@@ -39,6 +39,9 @@ namespace Panosse
         private string? downloadUrl = null;
         private bool estAJour = false;  // Indique si l'application est à jour
         private bool verificationEchouee = false;  // Indique si la vérification a échoué (pas de connexion)
+        
+        // Navigateurs en cours d'exécution
+        private System.Collections.Generic.List<string> navigateursEnCours = new System.Collections.Generic.List<string>();
 
         public MainWindow()
         {
@@ -53,12 +56,14 @@ namespace Panosse
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             // Vérifier si Chrome ou Edge sont ouverts
-            var runningBrowsers = CheckRunningBrowsers();
-            if (runningBrowsers.Count > 0)
+            navigateursEnCours = CheckRunningBrowsers();
+            if (navigateursEnCours.Count > 0)
             {
-                string browsers = string.Join(" et ", runningBrowsers);
-                StatusText.Text = $"⚠️ Veuillez fermer {browsers} pour un nettoyage complet";
+                string browsers = string.Join(" et ", navigateursEnCours);
+                StatusText.Text = $"⚠️ Veuillez fermer {browsers} pour un nettoyage complet (cliquez ici pour fermer automatiquement)";
                 StatusText.Foreground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
+                StatusText.Cursor = System.Windows.Input.Cursors.Hand; // Cursor main pour indiquer que c'est cliquable
+                StatusText.TextDecorations = TextDecorations.Underline; // Souligner pour indiquer que c'est cliquable
             }
             
             // Vérifier les mises à jour en arrière-plan
@@ -81,6 +86,104 @@ namespace Panosse
             catch { }
 
             return browsers;
+        }
+        
+        /// <summary>
+        /// Gestionnaire de clic sur le message d'alerte navigateur
+        /// </summary>
+        private void StatusText_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            // Vérifier si c'est l'alerte navigateur
+            if (navigateursEnCours.Count == 0)
+                return;
+            
+            // Demander confirmation
+            string browsers = string.Join(" et ", navigateursEnCours);
+            var result = MessageBox.Show(
+                $"Voulez-vous fermer {browsers} automatiquement ?\n\n" +
+                $"⚠️ Assurez-vous de sauvegarder votre travail avant de continuer.\n\n" +
+                $"Les navigateurs seront fermés et Panosse attendra 2 secondes avant de commencer le nettoyage.",
+                "Fermer les navigateurs",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question
+            );
+            
+            if (result == MessageBoxResult.Yes)
+            {
+                FermerNavigateurs();
+            }
+        }
+        
+        /// <summary>
+        /// Ferme les navigateurs en cours d'exécution
+        /// </summary>
+        private async void FermerNavigateurs()
+        {
+            try
+            {
+                int browsersTermines = 0;
+                
+                foreach (var browser in navigateursEnCours)
+                {
+                    try
+                    {
+                        string processName = browser == "Chrome" ? "chrome" : "msedge";
+                        var processes = Process.GetProcesses().Where(p => p.ProcessName.ToLower().Contains(processName));
+                        
+                        foreach (var process in processes)
+                        {
+                            try
+                            {
+                                process.CloseMainWindow(); // Essayer de fermer proprement
+                                await Task.Delay(500); // Attendre un peu
+                                
+                                if (!process.HasExited)
+                                {
+                                    process.Kill(); // Forcer si nécessaire
+                                }
+                                browsersTermines++;
+                            }
+                            catch { }
+                        }
+                    }
+                    catch { }
+                }
+                
+                // Attendre 2 secondes que tout se ferme
+                await Task.Delay(2000);
+                
+                // Revérifier les navigateurs
+                navigateursEnCours = CheckRunningBrowsers();
+                
+                if (navigateursEnCours.Count == 0)
+                {
+                    // Tous les navigateurs sont fermés
+                    StatusText.Text = "✅ Navigateurs fermés ! Vous pouvez maintenant nettoyer en toute sécurité.";
+                    StatusText.Foreground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
+                    StatusText.Cursor = System.Windows.Input.Cursors.Arrow;
+                    StatusText.TextDecorations = null;
+                    
+                    // Cacher le message après 5 secondes
+                    await Task.Delay(5000);
+                    StatusText.Text = "";
+                }
+                else
+                {
+                    // Certains navigateurs sont encore ouverts
+                    string browsers = string.Join(" et ", navigateursEnCours);
+                    StatusText.Text = $"⚠️ {browsers} n'a pas pu être fermé. Fermez-le manuellement.";
+                    StatusText.Foreground = new SolidColorBrush(Color.FromRgb(244, 67, 54)); // Rouge
+                    StatusText.Cursor = System.Windows.Input.Cursors.Arrow;
+                    StatusText.TextDecorations = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"❌ Erreur lors de la fermeture : {ex.Message}";
+                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(244, 67, 54)); // Rouge
+                StatusText.Cursor = System.Windows.Input.Cursors.Arrow;
+                StatusText.TextDecorations = null;
+            }
         }
 
         private void Window_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
