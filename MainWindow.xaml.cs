@@ -43,6 +43,30 @@ namespace Panosse
         // Handle pour la fenêtre (nécessaire pour RegisterHotKey)
         private IntPtr windowHandle;
         private System.Windows.Interop.HwndSource? hwndSource;
+        
+        /// <summary>
+        /// Log de debug pour tracer le démarrage de l'application
+        /// </summary>
+        private void LogDebug(string message)
+        {
+            try
+            {
+                string logPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    "panosse_debug.log"
+                );
+                
+                string log = $"[{DateTime.Now:HH:mm:ss.fff}] {message}\n";
+                File.AppendAllText(logPath, log);
+                
+                // Aussi en console pour debug
+                System.Diagnostics.Debug.WriteLine(log);
+            }
+            catch
+            {
+                // Si on ne peut pas logger, on continue quand même
+            }
+        }
 
         private Storyboard? pulseStoryboard;
         private ObservableCollection<string> taskMessages = new ObservableCollection<string>();
@@ -84,12 +108,30 @@ namespace Panosse
 
         public MainWindow()
         {
-            InitializeComponent();
-            Loaded += MainWindow_Loaded;
-            TaskList.ItemsSource = taskMessages;
-            
-            // Définir la version dynamiquement depuis l'assembly
-            VersionText.Text = $"v{VERSION_ACTUELLE}";
+            try
+            {
+                LogDebug("Constructeur - Début");
+                
+                InitializeComponent();
+                LogDebug("Constructeur - InitializeComponent OK");
+                
+                Loaded += MainWindow_Loaded;
+                LogDebug("Constructeur - Loaded event ajouté");
+                
+                TaskList.ItemsSource = taskMessages;
+                LogDebug("Constructeur - TaskList configuré");
+                
+                // Définir la version dynamiquement depuis l'assembly
+                VersionText.Text = $"v{VERSION_ACTUELLE}";
+                LogDebug($"Constructeur - Version définie: {VERSION_ACTUELLE}");
+                
+                LogDebug("Constructeur - Fin (succès)");
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Constructeur - ERREUR: {ex.Message}");
+                throw;
+            }
         }
 
         /// <summary>
@@ -855,26 +897,52 @@ namespace Panosse
         
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            // Initialiser le System Tray APRÈS que la fenêtre soit complètement chargée
-            InitialiserSystemTray();
-            
-            // Enregistrer le raccourci clavier global Ctrl+Alt+P
-            EnregistrerHotKey();
-            
-            // Vérifier si Chrome ou Edge sont ouverts
-            navigateursEnCours = CheckRunningBrowsers();
-            if (navigateursEnCours.Count > 0)
+            try
             {
-                string browsers = string.Join(" et ", navigateursEnCours);
-                StatusText.Text = $"⚠️ Veuillez fermer {browsers} pour un nettoyage complet (cliquez ici pour fermer automatiquement)";
-                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
-                StatusText.Cursor = System.Windows.Input.Cursors.Hand; // Cursor main pour indiquer que c'est cliquable
-                StatusText.TextDecorations = TextDecorations.Underline; // Souligner pour indiquer que c'est cliquable
+                LogDebug("MainWindow_Loaded - Début");
+                
+                // Initialiser le System Tray APRÈS que la fenêtre soit complètement chargée
+                LogDebug("MainWindow_Loaded - Initialisation System Tray...");
+                InitialiserSystemTray();
+                LogDebug("MainWindow_Loaded - System Tray initialisé OK");
+                
+                // Enregistrer le raccourci clavier global Ctrl+Alt+P
+                LogDebug("MainWindow_Loaded - Enregistrement HotKey...");
+                EnregistrerHotKey();
+                LogDebug("MainWindow_Loaded - HotKey enregistré OK");
+                
+                // Vérifier si Chrome ou Edge sont ouverts
+                LogDebug("MainWindow_Loaded - Vérification navigateurs...");
+                navigateursEnCours = CheckRunningBrowsers();
+                LogDebug($"MainWindow_Loaded - Navigateurs trouvés: {navigateursEnCours.Count}");
+                
+                if (navigateursEnCours.Count > 0)
+                {
+                    string browsers = string.Join(" et ", navigateursEnCours);
+                    StatusText.Text = $"⚠️ Veuillez fermer {browsers} pour un nettoyage complet (cliquez ici pour fermer automatiquement)";
+                    StatusText.Foreground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
+                    StatusText.Cursor = System.Windows.Input.Cursors.Hand; // Cursor main pour indiquer que c'est cliquable
+                    StatusText.TextDecorations = TextDecorations.Underline; // Souligner pour indiquer que c'est cliquable
             }
             
             // Vérifier les mises à jour en arrière-plan
+            LogDebug("MainWindow_Loaded - Vérification mises à jour...");
             _ = VerifierMiseAJour();
+            
+            LogDebug("MainWindow_Loaded - Fin (succès)");
         }
+        catch (Exception ex)
+        {
+            LogDebug($"MainWindow_Loaded - ERREUR: {ex.Message}");
+            LogDebug($"MainWindow_Loaded - StackTrace: {ex.StackTrace}");
+            MessageBox.Show(
+                $"Erreur lors du chargement de Panosse:\n\n{ex.Message}\n\nVoir panosse_crash.log sur le Bureau.",
+                "Panosse - Erreur",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error
+            );
+        }
+    }
 
         private System.Collections.Generic.List<string> CheckRunningBrowsers()
         {
