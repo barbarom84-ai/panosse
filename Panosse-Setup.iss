@@ -3,7 +3,7 @@
 ; Créé le 01/01/2025
 
 #define MyAppName "Panosse"
-#define MyAppVersion "1.1.1"
+#define MyAppVersion "2.0.0"
 #define MyAppPublisher "Panosse"
 #define MyAppURL "https://github.com/barbarom84-ai/panosse"
 #define MyAppExeName "Panosse.exe"

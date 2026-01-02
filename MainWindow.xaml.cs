@@ -70,6 +70,17 @@ namespace Panosse
         // System Tray Icon
         private Forms.NotifyIcon? notifyIcon;
         private Forms.ContextMenuStrip? contextMenu;
+        
+        // Mémoire Sélective (v2.0) - Surveillance du dossier Téléchargements
+        private System.Timers.Timer? surveillanceTimer;
+        private bool dossierTelechargementsEncombre = false;
+        private double tailleTelechargementsGo = 0;
+        private int nombreFichiersAnciens = 0;
+        private Drawing.Icon? iconeNormale;
+        private Drawing.Icon? iconeAlerte;
+        private const double SEUIL_TAILLE_GO = 5.0;
+        private const long SEUIL_FICHIER_GROS_MO = 200;
+        private const int SEUIL_JOURS_ANCIEN = 30;
 
         public MainWindow()
         {
@@ -107,6 +118,19 @@ namespace Panosse
             
             // Séparateur
             contextMenu.Items.Add(new Forms.ToolStripSeparator());
+            
+            // Menu "Pourquoi l'icône est rouge?" (Mémoire Sélective - v2.0)
+            var menuPourquoi = new Forms.ToolStripMenuItem("❓ Pourquoi l'icône est rouge ?");
+            menuPourquoi.Name = "MenuPourquoi";
+            menuPourquoi.Visible = false; // Visible uniquement si encombré
+            menuPourquoi.Click += (s, e) => AfficherExplicationEncombrement();
+            contextMenu.Items.Add(menuPourquoi);
+            
+            // Séparateur (visible uniquement si menu "Pourquoi" visible)
+            var separatorPourquoi = new Forms.ToolStripSeparator();
+            separatorPourquoi.Name = "SeparatorPourquoi";
+            separatorPourquoi.Visible = false;
+            contextMenu.Items.Add(separatorPourquoi);
             
             // Menu "Quitter"
             var menuQuitter = new Forms.ToolStripMenuItem("❌ Quitter");
@@ -161,6 +185,15 @@ namespace Panosse
             // Double-clic pour afficher la fenêtre
             notifyIcon.DoubleClick += (s, e) => AfficherFenetre();
             
+            // Stocker l'icône normale pour pouvoir basculer
+            iconeNormale = notifyIcon.Icon;
+            
+            // Créer l'icône d'alerte (rouge)
+            CreerIconeAlerte();
+            
+            // Démarrer la surveillance du dossier Téléchargements
+            DemarrerSurveillanceTelechi();
+            
             // Gérer la fermeture de la fenêtre (masquer au lieu de fermer)
             this.Closing += MainWindow_Closing;
         }
@@ -186,6 +219,9 @@ namespace Panosse
         {
             // Désenregistrer le HotKey
             DesenregistrerHotKey();
+            
+            // Arrêter la surveillance
+            ArreterSurveillanceTelechi();
             
             // Nettoyer l'icône du System Tray
             if (notifyIcon != null)
@@ -221,6 +257,262 @@ namespace Panosse
                 );
             }
         }
+        
+        #region Mémoire Sélective - Surveillance du dossier Téléchargements (v2.0)
+        
+        /// <summary>
+        /// Démarre la surveillance périodique du dossier Téléchargements
+        /// </summary>
+        private void DemarrerSurveillanceTelechi()
+        {
+            try
+            {
+                // Créer un timer qui se déclenche toutes les heures
+                surveillanceTimer = new System.Timers.Timer(3600000); // 1 heure = 3600000 ms
+                surveillanceTimer.Elapsed += async (sender, e) => await VerifierEncombrementTelechi();
+                surveillanceTimer.AutoReset = true;
+                surveillanceTimer.Start();
+                
+                // Faire une première vérification immédiatement (après 30 secondes pour ne pas ralentir le démarrage)
+                Task.Run(async () =>
+                {
+                    await Task.Delay(30000); // 30 secondes
+                    await VerifierEncombrementTelechi();
+                });
+                
+                System.Diagnostics.Debug.WriteLine("✅ Surveillance du dossier Téléchargements démarrée (vérification toutes les heures)");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Erreur démarrage surveillance: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Arrête la surveillance du dossier Téléchargements
+        /// </summary>
+        private void ArreterSurveillanceTelechi()
+        {
+            try
+            {
+                if (surveillanceTimer != null)
+                {
+                    surveillanceTimer.Stop();
+                    surveillanceTimer.Dispose();
+                    surveillanceTimer = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Erreur arrêt surveillance: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Vérifie l'encombrement du dossier Téléchargements de manière asynchrone
+        /// </summary>
+        private async Task VerifierEncombrementTelechi()
+        {
+            await Task.Run(() =>
+            {
+                try
+                {
+                    string downloadPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                    
+                    if (!Directory.Exists(downloadPath))
+                        return;
+                    
+                    long tailleTotal = 0;
+                    int fichiersAnciens = 0;
+                    DateTime seuil30Jours = DateTime.Now.AddDays(-SEUIL_JOURS_ANCIEN);
+                    
+                    // Parcourir tous les fichiers
+                    var fichiers = Directory.GetFiles(downloadPath, "*", SearchOption.AllDirectories);
+                    
+                    foreach (var fichier in fichiers)
+                    {
+                        try
+                        {
+                            var info = new FileInfo(fichier);
+                            tailleTotal += info.Length;
+                            
+                            // Vérifier les gros fichiers anciens
+                            long tailleMo = info.Length / (1024 * 1024);
+                            if (tailleMo >= SEUIL_FICHIER_GROS_MO && info.LastWriteTime < seuil30Jours)
+                            {
+                                fichiersAnciens++;
+                            }
+                        }
+                        catch
+                        {
+                            // Ignorer les fichiers inaccessibles
+                        }
+                    }
+                    
+                    // Convertir en Go
+                    double tailleGo = tailleTotal / (1024.0 * 1024.0 * 1024.0);
+                    
+                    // Déterminer si encombré
+                    bool etaitEncombre = dossierTelechargementsEncombre;
+                    dossierTelechargementsEncombre = tailleGo > SEUIL_TAILLE_GO || fichiersAnciens > 0;
+                    tailleTelechargementsGo = tailleGo;
+                    nombreFichiersAnciens = fichiersAnciens;
+                    
+                    System.Diagnostics.Debug.WriteLine($"📊 Téléchargements: {tailleGo:F2} Go, {fichiersAnciens} gros fichiers anciens");
+                    
+                    // Mettre à jour l'icône si l'état a changé
+                    if (etaitEncombre != dossierTelechargementsEncombre)
+                    {
+                        Dispatcher.InvokeAsync(() => MettreAJourIconeSystemTray());
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"❌ Erreur vérification encombrement: {ex.Message}");
+                }
+            });
+        }
+        
+        /// <summary>
+        /// Crée l'icône d'alerte (rouge) pour le System Tray
+        /// </summary>
+        private void CreerIconeAlerte()
+        {
+            try
+            {
+                // Créer une icône rouge à partir de l'icône normale
+                if (iconeNormale != null)
+                {
+                    // Créer un bitmap de 16x16 (taille standard System Tray)
+                    using (var bitmap = new Drawing.Bitmap(16, 16))
+                    using (var graphics = Drawing.Graphics.FromImage(bitmap))
+                    {
+                        // Dessiner l'icône normale
+                        graphics.DrawIcon(iconeNormale, 0, 0);
+                        
+                        // Ajouter un point d'exclamation rouge en haut à droite
+                        using (var brush = new Drawing.SolidBrush(Drawing.Color.Red))
+                        {
+                            graphics.FillEllipse(brush, 10, 0, 6, 6);
+                        }
+                        
+                        // Convertir en icône
+                        IntPtr hIcon = bitmap.GetHicon();
+                        iconeAlerte = Drawing.Icon.FromHandle(hIcon);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Erreur création icône alerte: {ex.Message}");
+                // En cas d'erreur, utiliser l'icône Warning de Windows
+                iconeAlerte = Drawing.SystemIcons.Warning;
+            }
+        }
+        
+        /// <summary>
+        /// Met à jour l'icône du System Tray en fonction de l'état d'encombrement
+        /// </summary>
+        private void MettreAJourIconeSystemTray()
+        {
+            if (notifyIcon == null || contextMenu == null)
+                return;
+            
+            try
+            {
+                if (dossierTelechargementsEncombre)
+                {
+                    // État encombré : icône rouge
+                    if (iconeAlerte != null)
+                    {
+                        notifyIcon.Icon = iconeAlerte;
+                        notifyIcon.Text = $"⚠️ Panosse - Téléchargements encombré ({tailleTelechargementsGo:F1} Go)";
+                    }
+                    
+                    // Afficher le menu "Pourquoi l'icône est rouge?"
+                    var menuPourquoi = contextMenu.Items.Find("MenuPourquoi", false).FirstOrDefault();
+                    var separatorPourquoi = contextMenu.Items.Find("SeparatorPourquoi", false).FirstOrDefault();
+                    
+                    if (menuPourquoi != null)
+                        menuPourquoi.Visible = true;
+                    if (separatorPourquoi != null)
+                        separatorPourquoi.Visible = true;
+                    
+                    System.Diagnostics.Debug.WriteLine("🔴 Icône System Tray passée en mode ALERTE");
+                }
+                else
+                {
+                    // État propre : icône normale
+                    if (iconeNormale != null)
+                    {
+                        notifyIcon.Icon = iconeNormale;
+                        notifyIcon.Text = "Panosse - La serpillère numérique";
+                    }
+                    
+                    // Masquer le menu "Pourquoi l'icône est rouge?"
+                    var menuPourquoi = contextMenu.Items.Find("MenuPourquoi", false).FirstOrDefault();
+                    var separatorPourquoi = contextMenu.Items.Find("SeparatorPourquoi", false).FirstOrDefault();
+                    
+                    if (menuPourquoi != null)
+                        menuPourquoi.Visible = false;
+                    if (separatorPourquoi != null)
+                        separatorPourquoi.Visible = false;
+                    
+                    System.Diagnostics.Debug.WriteLine("🟢 Icône System Tray passée en mode NORMAL");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Erreur mise à jour icône: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Affiche l'explication de l'encombrement du dossier Téléchargements
+        /// </summary>
+        private void AfficherExplicationEncombrement()
+        {
+            if (notifyIcon == null)
+                return;
+            
+            try
+            {
+                string message;
+                
+                if (tailleTelechargementsGo > SEUIL_TAILLE_GO && nombreFichiersAnciens > 0)
+                {
+                    message = $"Votre dossier Téléchargements commence à être encombré:\n\n" +
+                             $"📦 Taille totale: {tailleTelechargementsGo:F2} Go\n" +
+                             $"📂 {nombreFichiersAnciens} gros fichier(s) ancien(s) (>200 Mo, >30 jours)\n\n" +
+                             $"💡 Appuyez sur Ctrl+Alt+P pour faire de la place !";
+                }
+                else if (tailleTelechargementsGo > SEUIL_TAILLE_GO)
+                {
+                    message = $"Votre dossier Téléchargements commence à être encombré:\n\n" +
+                             $"📦 Taille totale: {tailleTelechargementsGo:F2} Go\n\n" +
+                             $"💡 Appuyez sur Ctrl+Alt+P pour faire de la place !";
+                }
+                else
+                {
+                    message = $"Votre dossier Téléchargements contient:\n\n" +
+                             $"📂 {nombreFichiersAnciens} gros fichier(s) ancien(s) (>200 Mo, >30 jours)\n\n" +
+                             $"💡 Appuyez sur Ctrl+Alt+P pour faire de la place !";
+                }
+                
+                notifyIcon.ShowBalloonTip(
+                    8000, // 8 secondes pour avoir le temps de lire
+                    "⚠️ Dossier Téléchargements encombré",
+                    message,
+                    Forms.ToolTipIcon.Warning
+                );
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Erreur affichage explication: {ex.Message}");
+            }
+        }
+        
+        #endregion
         
         /// <summary>
         /// Enregistre le raccourci clavier global Ctrl+Alt+P
