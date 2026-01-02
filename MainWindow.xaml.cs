@@ -11,6 +11,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using Microsoft.Win32;
@@ -189,10 +190,36 @@ namespace Panosse
         private void Window_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             // Permet de déplacer la fenêtre sans bordure en cliquant n'importe où sur le fond
+            // SAUF sur les éléments interactifs (Menu, Boutons, etc.)
             try
             {
                 if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed)
                 {
+                    // Vérifier si le clic est sur un élément interactif
+                    var element = e.OriginalSource as FrameworkElement;
+                    
+                    // Ne pas déplacer si on clique sur :
+                    // - Le menu
+                    // - Un bouton
+                    // - Un MenuItem
+                    // - Un TextBlock dans le menu
+                    if (element != null)
+                    {
+                        // Rechercher si l'élément ou un parent est un contrôle interactif
+                        DependencyObject current = element;
+                        while (current != null && current != this)
+                        {
+                            if (current is Button || 
+                                current is MenuItem || 
+                                current is Menu ||
+                                current is System.Windows.Controls.Primitives.Popup)
+                            {
+                                return; // Ne pas déplacer la fenêtre
+                            }
+                            current = VisualTreeHelper.GetParent(current);
+                        }
+                    }
+                    
                     this.DragMove();
                 }
             }
