@@ -1314,7 +1314,7 @@ REM Supprimer le script lui-même
                 if (verificationEchouee)
                 {
                     // La vérification a échoué (pas de connexion, GitHub inaccessible, etc.)
-                    BtnRechercherMAJ.Content = "Vérification impossible (vérifiez votre connexion)";
+                    BtnRechercherMAJ.Content = "⚠️ Vérification impossible\n(vérifiez votre connexion)";
                     BtnRechercherMAJ.Background = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
                     BtnRechercherMAJ.IsEnabled = true; // Permettre de réessayer
                     
@@ -1324,7 +1324,7 @@ REM Supprimer le script lui-même
                 else if (estAJour)
                 {
                     // Aucune mise à jour disponible
-                    BtnRechercherMAJ.Content = "Vous utilisez la dernière version ✅";
+                    BtnRechercherMAJ.Content = "✅ Version à jour";
                     BtnRechercherMAJ.Background = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
                     
                     // Afficher un message de confirmation
@@ -1366,7 +1366,7 @@ REM Supprimer le script lui-même
                     else
                     {
                         // L'utilisateur a refusé
-                        BtnRechercherMAJ.Content = "Rechercher des mises à jour";
+                        BtnRechercherMAJ.Content = "🔍 Vérifier les mises à jour";
                         BtnRechercherMAJ.IsEnabled = true;
                     }
                 }
@@ -1377,7 +1377,7 @@ REM Supprimer le script lui-même
             {
                 // Erreur inattendue lors du clic sur le bouton
                 // Afficher le bouton avec un message d'erreur
-                BtnRechercherMAJ.Content = "Vérification impossible (vérifiez votre connexion)";
+                BtnRechercherMAJ.Content = "⚠️ Vérification impossible\n(vérifiez votre connexion)";
                 BtnRechercherMAJ.Background = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
                 BtnRechercherMAJ.IsEnabled = true;
                 
