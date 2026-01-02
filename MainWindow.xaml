@@ -415,7 +415,7 @@
                     <!-- Lien GitHub -->
                     <TextBlock x:Name="LinkGitHub"
                                HorizontalAlignment="Center"
-                               Margin="0,0,0,20">
+                               Margin="0,0,0,30">
                         <Hyperlink NavigateUri="https://github.com/barbarom84-ai/panosse"
                                    RequestNavigate="Hyperlink_RequestNavigate"
                                    Foreground="#2196F3"
@@ -431,13 +431,19 @@
                             Background="#4CAF50"
                             Foreground="White"
                             BorderThickness="0"
-                            Padding="20,8"
-                            FontSize="12"
-                            FontWeight="SemiBold"
+                            Padding="25,12"
+                            FontSize="13"
+                            FontWeight="Bold"
                             Cursor="Hand"
                             HorizontalAlignment="Center"
-                            Margin="0,0,0,15"
+                            Margin="0,0,0,20"
                             IsEnabled="True">
+                        <Button.Effect>
+                            <DropShadowEffect Color="#4CAF50" 
+                                            BlurRadius="15" 
+                                            ShadowDepth="2" 
+                                            Opacity="0.5"/>
+                        </Button.Effect>
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Background" Value="#4CAF50"/>
@@ -445,7 +451,7 @@
                                     <Setter.Value>
                                         <ControlTemplate TargetType="Button">
                                             <Border Background="{TemplateBinding Background}"
-                                                    CornerRadius="8"
+                                                    CornerRadius="10"
                                                     Padding="{TemplateBinding Padding}">
                                                 <ContentPresenter HorizontalAlignment="Center"
                                                                 VerticalAlignment="Center"/>
