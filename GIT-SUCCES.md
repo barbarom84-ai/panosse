@@ -49,12 +49,12 @@ Fichiers exclus   : bin/, obj/, publish/, installer/, *.exe, *.zip
 2. **Lier votre dépôt local** :
    ```powershell
    cd "C:\Users\marco\Cursor Workplace\panosse"
-   & "C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/VOTRE-NOM/panosse.git
+   & "C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/barbarom84-ai/panosse.git
    & "C:\Program Files\Git\bin\git.exe" branch -M main
    & "C:\Program Files\Git\bin\git.exe" push -u origin main
    ```
 
-**N'oubliez pas de remplacer `VOTRE-NOM` par votre nom d'utilisateur GitHub !**
+**Note** : L'URL utilise maintenant votre nom d'utilisateur GitHub `barbarom84-ai` !
 
 ---
 

@@ -202,7 +202,7 @@ Si vous avez déjà créé une release v1.0.0, la barre apparaîtra.
 ### Changer le dépôt GitHub
 
 ```csharp
-private const string GITHUB_REPO = "votre-nom/votre-repo";
+private const string GITHUB_REPO = "barbarom84-ai/panosse";
 ```
 
 ### Changer la couleur de la barre

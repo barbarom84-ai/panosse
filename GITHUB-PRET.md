@@ -38,10 +38,10 @@ cd "C:\Users\marco\Cursor Workplace\panosse"
 & "C:\Program Files\Git\bin\git.exe" remote remove origin
 
 # Ajouter le bon remote
-& "C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/VOTRE-VRAI-NOM/Panosse.git
+& "C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/barbarom84-ai/Panosse.git
 ```
 
-**Remplacez `VOTRE-VRAI-NOM` par votre nom d'utilisateur GitHub !**
+**Note** : L'URL utilise maintenant votre nom d'utilisateur GitHub `barbarom84-ai` !
 
 ---
 
@@ -79,7 +79,7 @@ GitHub n'accepte plus les mots de passe simples. Créez un token :
 Quand vous ferez `git push`, Windows vous demandera :
 
 ```
-Username: votre-nom-github
+Username: barbarom84-ai
 Password: votre-token (ou mot de passe)
 ```
 

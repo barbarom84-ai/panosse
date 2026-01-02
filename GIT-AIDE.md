@@ -53,7 +53,7 @@ cd "C:\Users\marco\Cursor Workplace\panosse"
 
 ```powershell
 # Ajouter le remote
-& "C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/VOTRE-NOM/panosse.git
+& "C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/barbarom84-ai/panosse.git
 
 # Renommer la branche en main
 & "C:\Program Files\Git\bin\git.exe" branch -M main

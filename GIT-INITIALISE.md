@@ -98,12 +98,12 @@ GitHub vous donnera des commandes, utilisez :
 
 ```powershell
 cd "C:\Users\marco\Cursor Workplace\panosse"
-& "C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/votre-nom/panosse.git
+& "C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/barbarom84-ai/panosse.git
 & "C:\Program Files\Git\bin\git.exe" branch -M main
 & "C:\Program Files\Git\bin\git.exe" push -u origin main
 ```
 
-**Remplacez** `votre-nom` par votre nom d'utilisateur GitHub !
+**Note** : L'URL utilise maintenant votre nom d'utilisateur GitHub `barbarom84-ai` !
 
 ### 3. Première publication
 
