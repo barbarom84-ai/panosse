@@ -47,9 +47,16 @@ Application WPF moderne pour nettoyer rapidement votre système Windows en un se
 ### 🔄 Mises à jour automatiques
 - **Vérification au démarrage** : Connexion à l'API GitHub pour vérifier les nouvelles versions
 - **Notification discrète** : Barre verte en haut avec animation slide-in
-- **Mise à jour en 1 clic** : Redirection vers la page de téléchargement GitHub
+- **🆕 Installation automatique en 1 clic** : 
+  - Télécharge la nouvelle version directement
+  - Remplace l'ancien exécutable automatiquement
+  - Redémarre l'application avec la nouvelle version
+  - Aucune manipulation manuelle requise
+- **Sauvegarde automatique** : L'ancienne version est sauvegardée (.exe.old)
+- **Rollback automatique** : Restaure l'ancienne version en cas d'erreur
 - **Comparaison intelligente** : Utilise Semantic Versioning (MAJOR.MINOR.PATCH)
 - **Gestion des erreurs** : Fonctionne silencieusement, aucune alerte si offline
+- **Fallback manuel** : Ouvre la page GitHub si le téléchargement automatique échoue
 
 ## 🚀 Installation & Utilisation
 

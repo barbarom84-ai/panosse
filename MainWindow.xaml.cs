@@ -29,8 +29,10 @@ namespace Panosse
         private const string VERSION_ACTUELLE = "1.0.0";
         private const string GITHUB_REPO = "barbarom84-ai/panosse";
         
-        // URL de la dernière release
+        // URLs de la dernière release
         private string? derniereVersionUrl = null;
+        private string? derniereVersionTag = null;
+        private string? downloadUrl = null;
 
         public MainWindow()
         {
@@ -879,14 +881,32 @@ namespace Panosse
                         // Récupérer l'URL de la release
                         string htmlUrl = root.GetProperty("html_url").GetString() ?? "";
                         
+                        // Récupérer l'URL de téléchargement du .exe
+                        string exeDownloadUrl = "";
+                        if (root.TryGetProperty("assets", out JsonElement assets) && assets.GetArrayLength() > 0)
+                        {
+                            foreach (JsonElement asset in assets.EnumerateArray())
+                            {
+                                string assetName = asset.GetProperty("name").GetString() ?? "";
+                                // Chercher le fichier .exe (ex: Panosse-v1.0.1.exe)
+                                if (assetName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    exeDownloadUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
+                                    break;
+                                }
+                            }
+                        }
+                        
                         // Enlever le 'v' du début si présent
                         string versionDistante = tagName.TrimStart('v');
                         
                         // Comparer les versions
                         if (EstVersionPlusRecente(versionDistante, VERSION_ACTUELLE))
                         {
-                            // Sauvegarder l'URL pour le bouton "Mettre à jour"
+                            // Sauvegarder les URLs pour le bouton "Mettre à jour"
                             derniereVersionUrl = htmlUrl;
+                            derniereVersionTag = tagName;
+                            downloadUrl = exeDownloadUrl;
                             
                             // Afficher la barre de notification
                             await Dispatcher.InvokeAsync(() =>
@@ -1001,30 +1021,171 @@ namespace Panosse
         /// <summary>
         /// Gestionnaire pour le bouton "Mettre à jour"
         /// </summary>
-        private void BtnMettreAJour_Click(object sender, RoutedEventArgs e)
+        private async void BtnMettreAJour_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrEmpty(derniereVersionUrl))
+            if (string.IsNullOrEmpty(downloadUrl))
             {
-                try
+                // Fallback : ouvrir la page GitHub si pas d'URL de téléchargement
+                if (!string.IsNullOrEmpty(derniereVersionUrl))
                 {
-                    // Ouvrir la page de la release dans le navigateur
-                    Process.Start(new ProcessStartInfo
+                    try
                     {
-                        FileName = derniereVersionUrl,
-                        UseShellExecute = true
-                    });
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = derniereVersionUrl,
+                            UseShellExecute = true
+                        });
+                    }
+                    catch { }
                 }
-                catch
-                {
-                    MessageBox.Show(
-                        "Impossible d'ouvrir le navigateur.\n\n" +
-                        $"Visitez manuellement :\n{derniereVersionUrl}",
-                        "Erreur",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning
-                    );
-                }
+                return;
             }
+
+            try
+            {
+                // Désactiver le bouton pendant le téléchargement
+                BtnMettreAJour.IsEnabled = false;
+                BtnFermerUpdate.IsEnabled = false;
+                UpdateMessage.Text = "Téléchargement en cours...";
+
+                // Télécharger la nouvelle version
+                await TelechargerEtInstallerMiseAJour();
+            }
+            catch (Exception ex)
+            {
+                // En cas d'erreur, afficher un message et proposer le téléchargement manuel
+                var result = MessageBox.Show(
+                    $"Impossible de télécharger automatiquement la mise à jour.\n\n" +
+                    $"Erreur : {ex.Message}\n\n" +
+                    $"Voulez-vous ouvrir la page de téléchargement dans votre navigateur ?",
+                    "Erreur de mise à jour",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning
+                );
+
+                if (result == MessageBoxResult.Yes && !string.IsNullOrEmpty(derniereVersionUrl))
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = derniereVersionUrl,
+                            UseShellExecute = true
+                        });
+                    }
+                    catch { }
+                }
+
+                // Réactiver les boutons
+                BtnMettreAJour.IsEnabled = true;
+                BtnFermerUpdate.IsEnabled = true;
+                UpdateMessage.Text = $"Une nouvelle version ({derniereVersionTag}) est disponible !";
+            }
+        }
+
+        /// <summary>
+        /// Télécharge et installe la mise à jour automatiquement
+        /// </summary>
+        private async Task TelechargerEtInstallerMiseAJour()
+        {
+            // Chemin de l'exécutable actuel
+            string cheminActuel = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+            if (string.IsNullOrEmpty(cheminActuel))
+            {
+                throw new Exception("Impossible de déterminer le chemin de l'exécutable actuel.");
+            }
+
+            // Dossier temporaire
+            string dossierTemp = Path.GetTempPath();
+            string cheminNouvelExe = Path.Combine(dossierTemp, $"Panosse-{derniereVersionTag}.exe");
+            string cheminScriptBatch = Path.Combine(dossierTemp, "PanosseUpdate.bat");
+
+            // Télécharger le nouvel exécutable
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Add("User-Agent", "Panosse-App");
+                
+                // Télécharger avec progression (optionnel : on pourrait ajouter une barre de progression)
+                var response = await client.GetAsync(downloadUrl);
+                response.EnsureSuccessStatusCode();
+                
+                var bytes = await response.Content.ReadAsByteArrayAsync();
+                await File.WriteAllBytesAsync(cheminNouvelExe, bytes);
+            }
+
+            // Créer le script batch de mise à jour
+            string scriptBatch = $@"@echo off
+chcp 65001 >nul
+echo Mise a jour de Panosse en cours...
+echo.
+
+REM Attendre que Panosse se ferme (max 10 secondes)
+set /a compteur=0
+:attendre
+timeout /t 1 /nobreak >nul
+tasklist /FI ""IMAGENAME eq Panosse.exe"" 2>NUL | find /I /N ""Panosse.exe"">NUL
+if ""%ERRORLEVEL%""==""0"" (
+    set /a compteur+=1
+    if !compteur! lss 10 goto attendre
+)
+
+echo Remplacement de l'ancien executable...
+
+REM Sauvegarder l'ancien exe (au cas où)
+if exist ""{cheminActuel}.old"" del ""{cheminActuel}.old""
+move /Y ""{cheminActuel}"" ""{cheminActuel}.old"" >nul 2>&1
+
+REM Copier le nouveau exe
+move /Y ""{cheminNouvelExe}"" ""{cheminActuel}"" >nul 2>&1
+
+if errorlevel 1 (
+    echo ERREUR: Impossible de remplacer l'executable.
+    echo Restauration de l'ancienne version...
+    move /Y ""{cheminActuel}.old"" ""{cheminActuel}"" >nul 2>&1
+    pause
+    exit /b 1
+)
+
+echo Mise a jour terminee avec succes !
+echo Redemarrage de Panosse...
+timeout /t 2 /nobreak >nul
+
+REM Relancer Panosse
+start """" ""{cheminActuel}""
+
+REM Supprimer l'ancienne version
+if exist ""{cheminActuel}.old"" del ""{cheminActuel}.old""
+
+REM Supprimer le script lui-même
+(goto) 2>nul & del ""%~f0""
+";
+
+            // Écrire le script batch
+            await File.WriteAllTextAsync(cheminScriptBatch, scriptBatch, System.Text.Encoding.UTF8);
+
+            // Informer l'utilisateur
+            MessageBox.Show(
+                "La mise à jour a été téléchargée avec succès !\n\n" +
+                "Panosse va maintenant se fermer et se mettre à jour automatiquement.\n\n" +
+                "L'application redémarrera dans quelques secondes.",
+                "Mise à jour prête",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information
+            );
+
+            // Lancer le script batch
+            var processInfo = new ProcessStartInfo
+            {
+                FileName = cheminScriptBatch,
+                UseShellExecute = true,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+
+            Process.Start(processInfo);
+
+            // Fermer l'application actuelle
+            Application.Current.Shutdown();
         }
 
         /// <summary>
