@@ -33,6 +33,7 @@ namespace Panosse
         private string? derniereVersionUrl = null;
         private string? derniereVersionTag = null;
         private string? downloadUrl = null;
+        private bool estAJour = false;  // Indique si l'application est à jour
 
         public MainWindow()
         {
@@ -907,6 +908,7 @@ namespace Panosse
                             derniereVersionUrl = htmlUrl;
                             derniereVersionTag = tagName;
                             downloadUrl = exeDownloadUrl;
+                            estAJour = false;
                             
                             // Afficher la barre de notification
                             await Dispatcher.InvokeAsync(() =>
@@ -915,6 +917,11 @@ namespace Panosse
                                 AfficherBarreMiseAJour();
                             });
                         }
+                        else
+                        {
+                            // L'application est à jour
+                            estAJour = true;
+                        }
                     }
                 }
             }
@@ -922,6 +929,7 @@ namespace Panosse
             {
                 // En cas d'erreur (pas de connexion, API indisponible, etc.)
                 // On ne fait rien, pas besoin d'alerter l'utilisateur
+                estAJour = true; // Supposer qu'on est à jour si impossible de vérifier
             }
         }
 
@@ -1186,6 +1194,121 @@ REM Supprimer le script lui-même
 
             // Fermer l'application actuelle
             Application.Current.Shutdown();
+        }
+
+        /// <summary>
+        /// Gestionnaire pour le bouton "Rechercher des mises à jour" dans le panneau À propos
+        /// </summary>
+        private async void BtnRechercherMAJ_Click(object sender, RoutedEventArgs e)
+        {
+            // Désactiver le bouton pendant la vérification
+            BtnRechercherMAJ.IsEnabled = false;
+            BtnRechercherMAJ.Content = "Vérification...";
+
+            try
+            {
+                // Réinitialiser l'état
+                estAJour = false;
+                derniereVersionUrl = null;
+                derniereVersionTag = null;
+                downloadUrl = null;
+
+                // Vérifier les mises à jour
+                await VerifierMiseAJour();
+
+                // Attendre un court instant pour l'animation
+                await Task.Delay(500);
+
+                if (estAJour)
+                {
+                    // Aucune mise à jour disponible
+                    BtnRechercherMAJ.Content = "Vous utilisez la dernière version ✅";
+                    BtnRechercherMAJ.Background = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
+                    
+                    // Afficher un message de confirmation
+                    await Task.Delay(100);
+                    MessageBox.Show(
+                        $"Vous utilisez déjà la dernière version de Panosse !\n\n" +
+                        $"Version actuelle : {VERSION_ACTUELLE}\n\n" +
+                        $"Aucune mise à jour nécessaire.",
+                        "À jour",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information
+                    );
+                }
+                else if (!string.IsNullOrEmpty(downloadUrl))
+                {
+                    // Une mise à jour est disponible
+                    var result = MessageBox.Show(
+                        $"Une nouvelle version est disponible !\n\n" +
+                        $"Version actuelle : {VERSION_ACTUELLE}\n" +
+                        $"Nouvelle version : {derniereVersionTag}\n\n" +
+                        $"Voulez-vous télécharger et installer la mise à jour maintenant ?",
+                        "Mise à jour disponible",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question
+                    );
+
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        // Fermer le panneau À propos
+                        AnimerDisparitionOverlay();
+                        
+                        // Attendre la fin de l'animation
+                        await Task.Delay(300);
+                        
+                        // Lancer le téléchargement et l'installation
+                        BtnRechercherMAJ.Content = "Téléchargement...";
+                        await TelechargerEtInstallerMiseAJour();
+                    }
+                    else
+                    {
+                        // L'utilisateur a refusé
+                        BtnRechercherMAJ.Content = "Rechercher des mises à jour";
+                        BtnRechercherMAJ.IsEnabled = true;
+                    }
+                }
+                else
+                {
+                    // Erreur ou pas d'URL de téléchargement
+                    var result = MessageBox.Show(
+                        "Impossible de vérifier les mises à jour.\n\n" +
+                        "Vérifiez votre connexion Internet et réessayez.\n\n" +
+                        "Voulez-vous ouvrir la page des releases sur GitHub ?",
+                        "Erreur",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning
+                    );
+
+                    if (result == MessageBoxResult.Yes && !string.IsNullOrEmpty(derniereVersionUrl))
+                    {
+                        try
+                        {
+                            Process.Start(new ProcessStartInfo
+                            {
+                                FileName = derniereVersionUrl,
+                                UseShellExecute = true
+                            });
+                        }
+                        catch { }
+                    }
+
+                    BtnRechercherMAJ.Content = "Rechercher des mises à jour";
+                    BtnRechercherMAJ.IsEnabled = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Une erreur s'est produite lors de la vérification :\n\n{ex.Message}",
+                    "Erreur",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error
+                );
+
+                BtnRechercherMAJ.Content = "Rechercher des mises à jour";
+                BtnRechercherMAJ.IsEnabled = true;
+            }
         }
 
         /// <summary>
