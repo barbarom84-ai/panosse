@@ -36,6 +36,7 @@ namespace Panosse
         private string? derniereVersionTag = null;
         private string? downloadUrl = null;
         private bool estAJour = false;  // Indique si l'application est à jour
+        private bool verificationEchouee = false;  // Indique si la vérification a échoué (pas de connexion)
 
         public MainWindow()
         {
@@ -863,10 +864,16 @@ namespace Panosse
         /// </summary>
         private async Task VerifierMiseAJour()
         {
+            // Réinitialiser l'état d'erreur
+            verificationEchouee = false;
+            
             try
             {
                 using (var client = new HttpClient())
                 {
+                    // Timeout de 10 secondes pour éviter de bloquer trop longtemps
+                    client.Timeout = TimeSpan.FromSeconds(10);
+                    
                     // Ajouter un User-Agent (requis par l'API GitHub)
                     client.DefaultRequestHeaders.Add("User-Agent", "Panosse-App");
                     
@@ -914,6 +921,7 @@ namespace Panosse
                             derniereVersionTag = tagName;
                             downloadUrl = exeDownloadUrl;
                             estAJour = false;
+                            verificationEchouee = false;
                             
                             // Afficher la barre de notification
                             await Dispatcher.InvokeAsync(() =>
@@ -926,16 +934,45 @@ namespace Panosse
                         {
                             // L'application est à jour
                             estAJour = true;
+                            verificationEchouee = false;
                         }
                     }
                 }
             }
-            catch
+            catch (HttpRequestException)
             {
-                // En cas d'erreur (pas de connexion, API indisponible, etc.)
-                // On ne fait rien, pas besoin d'alerter l'utilisateur
-                estAJour = true; // Supposer qu'on est à jour si impossible de vérifier
+                // Erreur réseau (pas de connexion Internet, DNS échoue, etc.)
+                GererErreurVerification();
             }
+            catch (TaskCanceledException)
+            {
+                // Timeout de la requête (connexion trop lente)
+                GererErreurVerification();
+            }
+            catch (JsonException)
+            {
+                // Erreur de parsing JSON (réponse invalide de GitHub)
+                GererErreurVerification();
+            }
+            catch (Exception)
+            {
+                // Toute autre erreur imprévue
+                GererErreurVerification();
+            }
+        }
+
+        /// <summary>
+        /// Gère les erreurs de vérification de mise à jour de manière silencieuse
+        /// </summary>
+        private void GererErreurVerification()
+        {
+            // Marquer que la vérification a échoué
+            verificationEchouee = true;
+            estAJour = false;
+            
+            // Ne pas afficher de MessageBox ou de fenêtre d'erreur
+            // L'utilisateur peut continuer à utiliser l'application normalement
+            // Le bouton dans "À propos" affichera un message approprié
         }
 
         /// <summary>
@@ -1214,6 +1251,7 @@ REM Supprimer le script lui-même
             {
                 // Réinitialiser l'état
                 estAJour = false;
+                verificationEchouee = false;
                 derniereVersionUrl = null;
                 derniereVersionTag = null;
                 downloadUrl = null;
@@ -1224,7 +1262,17 @@ REM Supprimer le script lui-même
                 // Attendre un court instant pour l'animation
                 await Task.Delay(500);
 
-                if (estAJour)
+                if (verificationEchouee)
+                {
+                    // La vérification a échoué (pas de connexion, GitHub inaccessible, etc.)
+                    BtnRechercherMAJ.Content = "Vérification impossible (vérifiez votre connexion)";
+                    BtnRechercherMAJ.Background = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
+                    BtnRechercherMAJ.IsEnabled = true; // Permettre de réessayer
+                    
+                    // Pas de MessageBox - L'utilisateur peut continuer normalement
+                    // Il peut réessayer plus tard en cliquant à nouveau sur le bouton
+                }
+                else if (estAJour)
                 {
                     // Aucune mise à jour disponible
                     BtnRechercherMAJ.Content = "Vous utilisez la dernière version ✅";
@@ -1273,46 +1321,19 @@ REM Supprimer le script lui-même
                         BtnRechercherMAJ.IsEnabled = true;
                     }
                 }
-                else
-                {
-                    // Erreur ou pas d'URL de téléchargement
-                    var result = MessageBox.Show(
-                        "Impossible de vérifier les mises à jour.\n\n" +
-                        "Vérifiez votre connexion Internet et réessayez.\n\n" +
-                        "Voulez-vous ouvrir la page des releases sur GitHub ?",
-                        "Erreur",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Warning
-                    );
-
-                    if (result == MessageBoxResult.Yes && !string.IsNullOrEmpty(derniereVersionUrl))
-                    {
-                        try
-                        {
-                            Process.Start(new ProcessStartInfo
-                            {
-                                FileName = derniereVersionUrl,
-                                UseShellExecute = true
-                            });
-                        }
-                        catch { }
-                    }
-
-                    BtnRechercherMAJ.Content = "Rechercher des mises à jour";
-                    BtnRechercherMAJ.IsEnabled = true;
-                }
+                // Note : Le cas "verificationEchouee" est déjà géré plus haut
+                // Plus besoin de ce else final car on gère l'erreur silencieusement
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Une erreur s'est produite lors de la vérification :\n\n{ex.Message}",
-                    "Erreur",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error
-                );
-
-                BtnRechercherMAJ.Content = "Rechercher des mises à jour";
+                // Erreur inattendue lors du clic sur le bouton
+                // Afficher le bouton avec un message d'erreur
+                BtnRechercherMAJ.Content = "Vérification impossible (vérifiez votre connexion)";
+                BtnRechercherMAJ.Background = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
                 BtnRechercherMAJ.IsEnabled = true;
+                
+                // Ne pas afficher de MessageBox - rester silencieux
+                // L'utilisateur peut réessayer en recliquant
             }
         }
 
