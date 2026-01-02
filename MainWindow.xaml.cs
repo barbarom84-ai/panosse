@@ -184,7 +184,10 @@ namespace Panosse
                             iconeNormale = new Drawing.Icon(ms);
                         }
                     }
-                    notifyIcon.Icon = iconeNormale;
+                    if (notifyIcon != null && iconeNormale != null)
+                    {
+                        notifyIcon.Icon = iconeNormale;
+                    }
                     System.Diagnostics.Debug.WriteLine("✅ Icône propre chargée depuis les ressources");
                 }
                 else
@@ -194,7 +197,10 @@ namespace Panosse
                     if (File.Exists(iconPath))
                     {
                         iconeNormale = new Drawing.Icon(iconPath);
-                        notifyIcon.Icon = iconeNormale;
+                        if (notifyIcon != null && iconeNormale != null)
+                        {
+                            notifyIcon.Icon = iconeNormale;
+                        }
                         System.Diagnostics.Debug.WriteLine("✅ Icône propre chargée depuis fichier");
                     }
                 }
@@ -238,7 +244,10 @@ namespace Panosse
                 if (iconeNormale == null)
                 {
                     iconeNormale = Drawing.SystemIcons.Application;
-                    notifyIcon.Icon = iconeNormale;
+                    if (notifyIcon != null)
+                    {
+                        notifyIcon.Icon = iconeNormale;
+                    }
                     System.Diagnostics.Debug.WriteLine("⚠️ Utilisation icône système par défaut");
                 }
                 
@@ -254,7 +263,10 @@ namespace Panosse
                 // Fallback complet
                 iconeNormale = Drawing.SystemIcons.Application;
                 iconeAlerte = Drawing.SystemIcons.Warning;
-                notifyIcon.Icon = iconeNormale;
+                if (notifyIcon != null && iconeNormale != null)
+                {
+                    notifyIcon.Icon = iconeNormale;
+                }
             }
         }
         
