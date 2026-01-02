@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -25,8 +26,9 @@ namespace Panosse
         private int etapesCourantes = 0;
         private int etapesTotales = 8;
         
-        // Version actuelle de l'application
-        private const string VERSION_ACTUELLE = "1.0.0";
+        // Version actuelle de l'application (lue automatiquement depuis le .csproj)
+        private static readonly string VERSION_ACTUELLE = 
+            Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
         private const string GITHUB_REPO = "barbarom84-ai/panosse";
         
         // URLs de la dernière release
@@ -40,6 +42,9 @@ namespace Panosse
             InitializeComponent();
             Loaded += MainWindow_Loaded;
             TaskList.ItemsSource = taskMessages;
+            
+            // Définir la version dynamiquement depuis l'assembly
+            VersionText.Text = $"v{VERSION_ACTUELLE}";
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
