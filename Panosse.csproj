@@ -8,6 +8,7 @@
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>assets\panosse.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     
     <!-- Configuration pour la publication -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

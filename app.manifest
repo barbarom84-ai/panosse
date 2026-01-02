@@ -47,18 +47,16 @@
     </application>
   </compatibility>
 
-  <!-- Indique que l'application prend en charge DPI et qu'elle ne sera pas automatiquement mise à l'échelle par Windows à des
-       DPI plus élevés. Les applications Windows Presentation Foundation (WPF) prennent automatiquement en charge DPI et n'ont pas besoin 
-       d'opter pour ce choix. Les applications Windows Forms qui ciblent .NET Framework 4.6 et qui optent pour ce paramètre, doivent 
-       également affecter la valeur 'true' au paramètre 'EnableWindowsFormsHighDpiAutoResizing' dans leur fichier app.config. 
-       
-       Rend l'application compatible avec les chemins d'accès longs. Consultez https://docs.microsoft.com/windows/win32/fileio/maximum-file-path-limitation -->
+  <!-- Paramètres DPI désormais configurés via ApplicationHighDpiMode dans le .csproj
+       au lieu du manifeste (recommandation Microsoft pour WPF/WinForms modernes) -->
+  <!--
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
       <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true</dpiAware>
       <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
     </windowsSettings>
   </application>
+  -->
 
 </assembly>
 
