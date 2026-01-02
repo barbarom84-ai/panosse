@@ -121,25 +121,41 @@ namespace Panosse
                 ContextMenuStrip = contextMenu
             };
             
-            // Charger l'icône depuis les ressources
+            // Charger l'icône depuis les ressources embarquées
             try
             {
-                // Charger l'icône .ico depuis le dossier assets
-                string iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "panosse.ico");
-                if (File.Exists(iconPath))
+                // Méthode 1 : Essayer de charger depuis les ressources embarquées
+                var iconUri = new Uri("pack://application:,,,/assets/panosse.ico");
+                var streamInfo = System.Windows.Application.GetResourceStream(iconUri);
+                
+                if (streamInfo != null)
                 {
-                    notifyIcon.Icon = new Drawing.Icon(iconPath);
+                    using (var stream = streamInfo.Stream)
+                    {
+                        notifyIcon.Icon = new Drawing.Icon(stream);
+                    }
                 }
                 else
                 {
-                    // Fallback : utiliser l'icône système
-                    notifyIcon.Icon = Drawing.SystemIcons.Application;
+                    // Méthode 2 : Essayer de charger depuis le fichier physique (mode Debug)
+                    string iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "panosse.ico");
+                    if (File.Exists(iconPath))
+                    {
+                        notifyIcon.Icon = new Drawing.Icon(iconPath);
+                    }
+                    else
+                    {
+                        // Fallback : utiliser l'icône système
+                        notifyIcon.Icon = Drawing.SystemIcons.Application;
+                        System.Diagnostics.Debug.WriteLine("⚠️ Icône panosse.ico introuvable, utilisation de l'icône système");
+                    }
                 }
             }
-            catch
+            catch (Exception ex)
             {
                 // En cas d'erreur, utiliser l'icône système par défaut
                 notifyIcon.Icon = Drawing.SystemIcons.Application;
+                System.Diagnostics.Debug.WriteLine($"⚠️ Erreur chargement icône: {ex.Message}");
             }
             
             // Double-clic pour afficher la fenêtre
