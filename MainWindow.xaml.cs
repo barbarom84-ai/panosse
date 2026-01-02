@@ -213,6 +213,62 @@ namespace Panosse
             OverlayAPropos.Visibility = Visibility.Visible;
             AnimerApparitionOverlay();
         }
+        
+        /// <summary>
+        /// Gestionnaire pour le menu "Actualiser la détection"
+        /// </summary>
+        private void MenuItem_Actualiser_Click(object sender, RoutedEventArgs e)
+        {
+            // Revérifier les navigateurs en cours d'exécution
+            navigateursEnCours = CheckRunningBrowsers();
+            
+            if (navigateursEnCours.Count > 0)
+            {
+                string browsers = string.Join(" et ", navigateursEnCours);
+                StatusText.Text = $"⚠️ Veuillez fermer {browsers} pour un nettoyage complet (cliquez ici pour fermer automatiquement)";
+                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
+                StatusText.Cursor = System.Windows.Input.Cursors.Hand;
+                StatusText.TextDecorations = TextDecorations.Underline;
+            }
+            else
+            {
+                StatusText.Text = "✅ Aucun navigateur ouvert. Vous pouvez nettoyer en toute sécurité !";
+                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
+                StatusText.Cursor = System.Windows.Input.Cursors.Arrow;
+                StatusText.TextDecorations = null;
+                
+                // Cacher le message après 3 secondes
+                Task.Run(async () =>
+                {
+                    await Task.Delay(3000);
+                    await Dispatcher.InvokeAsync(() => StatusText.Text = "");
+                });
+            }
+        }
+        
+        /// <summary>
+        /// Gestionnaire pour le menu "Ouvrir le dépôt GitHub"
+        /// </summary>
+        private void MenuItem_GitHub_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "https://github.com/barbarom84-ai/panosse",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Impossible d'ouvrir le navigateur.\n\nURL : https://github.com/barbarom84-ai/panosse\n\nErreur : {ex.Message}",
+                    "Erreur",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error
+                );
+            }
+        }
 
         private void BtnRetourAPropos_Click(object sender, RoutedEventArgs e)
         {

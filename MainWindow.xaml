@@ -108,11 +108,45 @@
     </Window.Resources>
 
     <Grid>
+        <!-- Barre de menu -->
+        <Menu x:Name="MainMenu"
+              Background="White"
+              VerticalAlignment="Top"
+              Height="30"
+              Panel.ZIndex="10"
+              BorderThickness="0,0,0,1"
+              BorderBrush="#E0E0E0">
+            <Menu.Effect>
+                <DropShadowEffect BlurRadius="5" ShadowDepth="1" Opacity="0.1" Color="Black"/>
+            </Menu.Effect>
+            
+            <!-- Menu Fichier -->
+            <MenuItem Header="📁 _Fichier" FontSize="12" Padding="10,5">
+                <MenuItem Header="🔄 _Actualiser la détection" Click="MenuItem_Actualiser_Click" />
+                <Separator />
+                <MenuItem Header="❌ _Quitter" Click="BtnQuitter_Click" InputGestureText="Alt+F4"/>
+            </MenuItem>
+            
+            <!-- Menu Outils -->
+            <MenuItem Header="🔧 _Outils" FontSize="12" Padding="10,5">
+                <MenuItem Header="🔍 _Vérifier les mises à jour" Click="BtnRechercherMAJ_Click" />
+                <Separator />
+                <MenuItem Header="🌐 _Ouvrir le dépôt GitHub" Click="MenuItem_GitHub_Click" />
+            </MenuItem>
+            
+            <!-- Menu Aide -->
+            <MenuItem Header="❓ _Aide" FontSize="12" Padding="10,5">
+                <MenuItem Header="ℹ️ _À propos de Panosse" Click="BtnAPropos_Click" InputGestureText="F1"/>
+            </MenuItem>
+        </Menu>
+        
         <!-- Barre de notification de mise à jour -->
         <Border x:Name="UpdateBar"
                 Background="#4CAF50"
                 Height="40"
                 VerticalAlignment="Top"
+                Margin="0,30,0,0"
+                Panel.ZIndex="9"
                 Visibility="Collapsed"
                 Opacity="0">
             <Border.Effect>
@@ -238,19 +272,6 @@
                 Margin="0,10,10,0"
                 Click="BtnQuitter_Click"/>
 
-        <!-- Bouton À propos en bas à gauche -->
-        <Button x:Name="BtnAPropos"
-                HorizontalAlignment="Left"
-                VerticalAlignment="Bottom"
-                Margin="15,0,0,15"
-                Background="Transparent"
-                BorderThickness="0"
-                Cursor="Hand"
-                Click="BtnAPropos_Click"
-                ToolTip="À propos de Panosse">
-            <TextBlock Text="ℹ️" FontSize="20" Opacity="0.6"/>
-        </Button>
-
         <!-- Titre -->
         <TextBlock Text="Panosse" 
                    FontSize="36" 
@@ -258,7 +279,7 @@
                    Foreground="#424242" 
                    HorizontalAlignment="Center" 
                    VerticalAlignment="Top" 
-                   Margin="0,30,0,0"/>
+                   Margin="0,60,0,0"/>
 
         <!-- Zone centrale -->
         <StackPanel HorizontalAlignment="Center" 
