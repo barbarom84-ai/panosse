@@ -44,6 +44,13 @@ Application WPF moderne pour nettoyer rapidement votre système Windows en un se
 - **Calcul précis** : Affiche l'espace libéré par catégorie
 - **Animation de célébration** : Rebond du message de succès
 
+### 🔄 Mises à jour automatiques
+- **Vérification au démarrage** : Connexion à l'API GitHub pour vérifier les nouvelles versions
+- **Notification discrète** : Barre verte en haut avec animation slide-in
+- **Mise à jour en 1 clic** : Redirection vers la page de téléchargement GitHub
+- **Comparaison intelligente** : Utilise Semantic Versioning (MAJOR.MINOR.PATCH)
+- **Gestion des erreurs** : Fonctionne silencieusement, aucune alerte si offline
+
 ## 🚀 Installation & Utilisation
 
 ### Option 1 : Installateur (Recommandé)

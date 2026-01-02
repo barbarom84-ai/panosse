@@ -3,7 +3,9 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -22,6 +24,13 @@ namespace Panosse
         private ObservableCollection<string> taskMessages = new ObservableCollection<string>();
         private int etapesCourantes = 0;
         private int etapesTotales = 8;
+        
+        // Version actuelle de l'application
+        private const string VERSION_ACTUELLE = "1.0.0";
+        private const string GITHUB_REPO = "barbarom84-ai/panosse";
+        
+        // URL de la dernière release
+        private string? derniereVersionUrl = null;
 
         public MainWindow()
         {
@@ -40,6 +49,9 @@ namespace Panosse
                 StatusText.Text = $"⚠️ Veuillez fermer {browsers} pour un nettoyage complet";
                 StatusText.Foreground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
             }
+            
+            // Vérifier les mises à jour en arrière-plan
+            _ = VerifierMiseAJour();
         }
 
         private System.Collections.Generic.List<string> CheckRunningBrowsers()
@@ -832,6 +844,195 @@ namespace Panosse
             catch { }
 
             return taille;
+        }
+
+        // ==========================================
+        // VÉRIFICATION DES MISES À JOUR
+        // ==========================================
+
+        /// <summary>
+        /// Vérifie si une nouvelle version est disponible sur GitHub
+        /// </summary>
+        private async Task VerifierMiseAJour()
+        {
+            try
+            {
+                using (var client = new HttpClient())
+                {
+                    // Ajouter un User-Agent (requis par l'API GitHub)
+                    client.DefaultRequestHeaders.Add("User-Agent", "Panosse-App");
+                    
+                    // URL de l'API GitHub pour la dernière release
+                    string apiUrl = $"https://api.github.com/repos/{GITHUB_REPO}/releases/latest";
+                    
+                    // Récupérer les informations de la dernière release
+                    var response = await client.GetStringAsync(apiUrl);
+                    
+                    // Parser la réponse JSON
+                    using (JsonDocument doc = JsonDocument.Parse(response))
+                    {
+                        var root = doc.RootElement;
+                        
+                        // Récupérer le tag_name (ex: "v1.0.1")
+                        string tagName = root.GetProperty("tag_name").GetString() ?? "";
+                        
+                        // Récupérer l'URL de la release
+                        string htmlUrl = root.GetProperty("html_url").GetString() ?? "";
+                        
+                        // Enlever le 'v' du début si présent
+                        string versionDistante = tagName.TrimStart('v');
+                        
+                        // Comparer les versions
+                        if (EstVersionPlusRecente(versionDistante, VERSION_ACTUELLE))
+                        {
+                            // Sauvegarder l'URL pour le bouton "Mettre à jour"
+                            derniereVersionUrl = htmlUrl;
+                            
+                            // Afficher la barre de notification
+                            await Dispatcher.InvokeAsync(() =>
+                            {
+                                UpdateMessage.Text = $"Une nouvelle version ({tagName}) est disponible !";
+                                AfficherBarreMiseAJour();
+                            });
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // En cas d'erreur (pas de connexion, API indisponible, etc.)
+                // On ne fait rien, pas besoin d'alerter l'utilisateur
+            }
+        }
+
+        /// <summary>
+        /// Compare deux versions au format X.Y.Z
+        /// </summary>
+        private bool EstVersionPlusRecente(string versionDistante, string versionLocale)
+        {
+            try
+            {
+                // Enlever les suffixes comme "-beta", "-alpha" pour la comparaison
+                versionDistante = versionDistante.Split('-')[0];
+                versionLocale = versionLocale.Split('-')[0];
+                
+                var partsDistante = versionDistante.Split('.').Select(int.Parse).ToArray();
+                var partsLocale = versionLocale.Split('.').Select(int.Parse).ToArray();
+                
+                // Comparer MAJOR
+                if (partsDistante[0] > partsLocale[0]) return true;
+                if (partsDistante[0] < partsLocale[0]) return false;
+                
+                // Comparer MINOR
+                if (partsDistante.Length > 1 && partsLocale.Length > 1)
+                {
+                    if (partsDistante[1] > partsLocale[1]) return true;
+                    if (partsDistante[1] < partsLocale[1]) return false;
+                }
+                
+                // Comparer PATCH
+                if (partsDistante.Length > 2 && partsLocale.Length > 2)
+                {
+                    if (partsDistante[2] > partsLocale[2]) return true;
+                }
+                
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Affiche la barre de notification avec animation
+        /// </summary>
+        private void AfficherBarreMiseAJour()
+        {
+            UpdateBar.Visibility = Visibility.Visible;
+            
+            // Animation de slide-in + fade-in
+            var slideAnimation = new ThicknessAnimation
+            {
+                From = new Thickness(0, -40, 0, 0),
+                To = new Thickness(0, 0, 0, 0),
+                Duration = TimeSpan.FromSeconds(0.4),
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            };
+            
+            var fadeAnimation = new DoubleAnimation
+            {
+                From = 0,
+                To = 1,
+                Duration = TimeSpan.FromSeconds(0.4)
+            };
+            
+            UpdateBar.BeginAnimation(MarginProperty, slideAnimation);
+            UpdateBar.BeginAnimation(OpacityProperty, fadeAnimation);
+        }
+
+        /// <summary>
+        /// Masque la barre de notification avec animation
+        /// </summary>
+        private void MasquerBarreMiseAJour()
+        {
+            var slideAnimation = new ThicknessAnimation
+            {
+                To = new Thickness(0, -40, 0, 0),
+                Duration = TimeSpan.FromSeconds(0.3),
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
+            };
+            
+            var fadeAnimation = new DoubleAnimation
+            {
+                To = 0,
+                Duration = TimeSpan.FromSeconds(0.3)
+            };
+            
+            slideAnimation.Completed += (s, e) =>
+            {
+                UpdateBar.Visibility = Visibility.Collapsed;
+            };
+            
+            UpdateBar.BeginAnimation(MarginProperty, slideAnimation);
+            UpdateBar.BeginAnimation(OpacityProperty, fadeAnimation);
+        }
+
+        /// <summary>
+        /// Gestionnaire pour le bouton "Mettre à jour"
+        /// </summary>
+        private void BtnMettreAJour_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(derniereVersionUrl))
+            {
+                try
+                {
+                    // Ouvrir la page de la release dans le navigateur
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = derniereVersionUrl,
+                        UseShellExecute = true
+                    });
+                }
+                catch
+                {
+                    MessageBox.Show(
+                        "Impossible d'ouvrir le navigateur.\n\n" +
+                        $"Visitez manuellement :\n{derniereVersionUrl}",
+                        "Erreur",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning
+                    );
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gestionnaire pour fermer la barre de notification
+        /// </summary>
+        private void BtnFermerUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            MasquerBarreMiseAJour();
         }
     }
 }

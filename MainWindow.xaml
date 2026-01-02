@@ -108,6 +108,108 @@
     </Window.Resources>
 
     <Grid>
+        <!-- Barre de notification de mise à jour -->
+        <Border x:Name="UpdateBar"
+                Background="#4CAF50"
+                Height="40"
+                VerticalAlignment="Top"
+                Visibility="Collapsed"
+                Opacity="0">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+            </Border.Effect>
+            <Grid Margin="15,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <!-- Icône et message -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="🔔" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="UpdateMessage"
+                               Text="Une nouvelle version est disponible !"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="White"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                
+                <!-- Bouton Mettre à jour -->
+                <Button x:Name="BtnMettreAJour"
+                        Grid.Column="1"
+                        Content="Mettre à jour"
+                        Click="BtnMettreAJour_Click"
+                        Background="White"
+                        Foreground="#4CAF50"
+                        BorderThickness="0"
+                        Padding="15,5"
+                        FontSize="12"
+                        FontWeight="SemiBold"
+                        Cursor="Hand"
+                        Margin="0,0,10,0">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                CornerRadius="5"
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center"
+                                                            VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#F5F5F5"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                
+                <!-- Bouton fermer -->
+                <Button x:Name="BtnFermerUpdate"
+                        Grid.Column="2"
+                        Content="×"
+                        Click="BtnFermerUpdate_Click"
+                        Background="Transparent"
+                        Foreground="White"
+                        BorderThickness="0"
+                        FontSize="20"
+                        FontWeight="Bold"
+                        Width="25"
+                        Height="25"
+                        Cursor="Hand">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                CornerRadius="3">
+                                            <ContentPresenter HorizontalAlignment="Center"
+                                                            VerticalAlignment="Center"
+                                                            Margin="0,-3,0,0"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#388E3C"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+        </Border>
+
         <!-- Bouton Quitter en haut à droite -->
         <Button x:Name="BtnQuitter" 
                 Style="{StaticResource CloseButtonStyle}"
