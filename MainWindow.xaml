@@ -8,7 +8,7 @@
         AllowsTransparency="True"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
-        Icon="pack://application:,,,/assets/panosse.ico"
+        Icon="pack://application:,,,/assets/panosse.png"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
 
     <Window.Background>
