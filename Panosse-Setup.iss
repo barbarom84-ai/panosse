@@ -75,9 +75,9 @@ Name: "startupicon"; Description: "{cm:AutoStartProgram,{#MyAppName}}"; GroupDes
 ; Fichier principal et toutes les DLLs natives (depuis le dossier publish)
 Source: "bin\Release\net8.0-windows\win-x64\publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "bin\Release\net8.0-windows\win-x64\publish\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs
 
-; Fichiers icônes supplémentaires pour le System Tray (v2.0.0 - mémoire sélective)
+; Fichiers icônes pour le System Tray (v2.0.0 - mémoire sélective)
+; Copiés depuis le dossier assets source (pas depuis publish car embarqués)
 Source: "{#MyAppIconClean}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyAppIconDirty}"; DestDir: "{app}"; Flags: ignoreversion
 
