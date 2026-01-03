@@ -16,7 +16,7 @@
     <PublishSingleFile Condition="'$(Configuration)' == 'Release'">true</PublishSingleFile>
     <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
     <PublishReadyToRun>true</PublishReadyToRun>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     
     <!-- Informations de version -->

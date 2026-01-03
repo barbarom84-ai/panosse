@@ -72,14 +72,14 @@ Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescrip
 Name: "startupicon"; Description: "{cm:AutoStartProgram,{#MyAppName}}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-; Fichier principal (depuis le dossier publish)
+; Fichier principal et toutes les DLLs natives (depuis le dossier publish)
 Source: "bin\Release\net8.0-windows\win-x64\publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "bin\Release\net8.0-windows\win-x64\publish\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs
 
-; Fichiers icônes (v2.0.0 - nécessaires pour la mémoire sélective)
+; Fichiers icônes supplémentaires pour le System Tray (v2.0.0 - mémoire sélective)
 Source: "{#MyAppIconClean}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyAppIconDirty}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "assets\panosse.ico"; DestDir: "{app}"; Flags: ignoreversion
-Source: "assets\panosse.png"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Fichiers de documentation (optionnels)
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion isreadme; DestName: "LisezMoi.txt"
