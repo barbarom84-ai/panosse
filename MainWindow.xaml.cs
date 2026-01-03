@@ -45,9 +45,12 @@ namespace Panosse
         
         /// <summary>
         /// Log de debug pour tracer le démarrage de l'application
+        /// Actif uniquement en mode DEBUG (supprimé en Release)
         /// </summary>
+        [System.Diagnostics.Conditional("DEBUG")]
         private void LogDebug(string message)
         {
+#if DEBUG
             try
             {
                 string logPath = Path.Combine(
@@ -55,8 +58,8 @@ namespace Panosse
                     "panosse_debug.log"
                 );
                 
-                string log = $"[{DateTime.Now:HH:mm:ss.fff}] {message}\n";
-                File.AppendAllText(logPath, log);
+                string log = $"[{DateTime.Now:HH:mm:ss.fff}] {message}";
+                File.AppendAllText(logPath, log + "\n");
                 
                 // Aussi en console pour debug
                 System.Diagnostics.Debug.WriteLine(log);
@@ -65,6 +68,7 @@ namespace Panosse
             {
                 // Si on ne peut pas logger, on continue quand même
             }
+#endif
         }
 
         private Storyboard? pulseStoryboard;
@@ -228,7 +232,7 @@ namespace Panosse
                     {
                         notifyIcon.Icon = iconeNormale;
                     }
-                    System.Diagnostics.Debug.WriteLine("✅ Icône propre chargée depuis les ressources");
+                    LogDebug("✅ Icône propre chargée depuis les ressources");
                 }
                 else
                 {
@@ -241,7 +245,7 @@ namespace Panosse
                         {
                             notifyIcon.Icon = iconeNormale;
                         }
-                        System.Diagnostics.Debug.WriteLine("✅ Icône propre chargée depuis fichier");
+                        LogDebug("✅ Icône propre chargée depuis fichier");
                     }
                 }
                 
@@ -261,7 +265,7 @@ namespace Panosse
                             iconeAlerte = new Drawing.Icon(ms);
                         }
                     }
-                    System.Diagnostics.Debug.WriteLine("✅ Icône sale chargée depuis les ressources");
+                    LogDebug("✅ Icône sale chargée depuis les ressources");
                 }
                 else
                 {
@@ -270,12 +274,12 @@ namespace Panosse
                     if (File.Exists(iconPath))
                     {
                         iconeAlerte = new Drawing.Icon(iconPath);
-                        System.Diagnostics.Debug.WriteLine("✅ Icône sale chargée depuis fichier");
+                        LogDebug("✅ Icône sale chargée depuis fichier");
                     }
                     else
                     {
                         // Fallback final : créer une icône rouge dynamiquement
-                        System.Diagnostics.Debug.WriteLine("⚠️ panosse_sale.ico introuvable, création dynamique");
+                        LogDebug("⚠️ panosse_sale.ico introuvable, création dynamique");
                         CreerIconeAlerteDynamique();
                     }
                 }
@@ -288,18 +292,18 @@ namespace Panosse
                     {
                         notifyIcon.Icon = iconeNormale;
                     }
-                    System.Diagnostics.Debug.WriteLine("⚠️ Utilisation icône système par défaut");
+                    LogDebug("⚠️ Utilisation icône système par défaut");
                 }
                 
                 if (iconeAlerte == null)
                 {
                     iconeAlerte = Drawing.SystemIcons.Warning;
-                    System.Diagnostics.Debug.WriteLine("⚠️ Utilisation icône Warning système par défaut");
+                    LogDebug("⚠️ Utilisation icône Warning système par défaut");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Erreur chargement icônes: {ex.Message}");
+                LogDebug($"❌ Erreur chargement icônes: {ex.Message}");
                 // Fallback complet
                 iconeNormale = Drawing.SystemIcons.Application;
                 iconeAlerte = Drawing.SystemIcons.Warning;
@@ -392,11 +396,11 @@ namespace Panosse
                     await VerifierEncombrementTelechi();
                 });
                 
-                System.Diagnostics.Debug.WriteLine("✅ Surveillance du dossier Téléchargements démarrée (vérification toutes les heures)");
+                LogDebug("✅ Surveillance du dossier Téléchargements démarrée (vérification toutes les heures)");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Erreur démarrage surveillance: {ex.Message}");
+                LogDebug($"❌ Erreur démarrage surveillance: {ex.Message}");
             }
         }
         
@@ -416,7 +420,7 @@ namespace Panosse
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Erreur arrêt surveillance: {ex.Message}");
+                LogDebug($"❌ Erreur arrêt surveillance: {ex.Message}");
             }
         }
         
@@ -470,7 +474,7 @@ namespace Panosse
                     tailleTelechargementsGo = tailleGo;
                     nombreFichiersAnciens = fichiersAnciens;
                     
-                    System.Diagnostics.Debug.WriteLine($"📊 Téléchargements: {tailleGo:F2} Go, {fichiersAnciens} gros fichiers anciens");
+                    LogDebug($"📊 Téléchargements: {tailleGo:F2} Go, {fichiersAnciens} gros fichiers anciens");
                     
                     // Mettre à jour l'icône si l'état a changé
                     if (etaitEncombre != dossierTelechargementsEncombre)
@@ -480,7 +484,7 @@ namespace Panosse
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"❌ Erreur vérification encombrement: {ex.Message}");
+                    LogDebug($"❌ Erreur vérification encombrement: {ex.Message}");
                 }
             });
         }
@@ -516,7 +520,7 @@ namespace Panosse
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Erreur création icône alerte: {ex.Message}");
+                LogDebug($"❌ Erreur création icône alerte: {ex.Message}");
                 // En cas d'erreur, utiliser l'icône Warning de Windows
                 iconeAlerte = Drawing.SystemIcons.Warning;
             }
@@ -550,7 +554,7 @@ namespace Panosse
                     if (separatorPourquoi != null)
                         separatorPourquoi.Visible = true;
                     
-                    System.Diagnostics.Debug.WriteLine("🔴 Icône System Tray passée en mode ALERTE");
+                    LogDebug("🔴 Icône System Tray passée en mode ALERTE");
                 }
                 else
                 {
@@ -570,12 +574,12 @@ namespace Panosse
                     if (separatorPourquoi != null)
                         separatorPourquoi.Visible = false;
                     
-                    System.Diagnostics.Debug.WriteLine("🟢 Icône System Tray passée en mode NORMAL");
+                    LogDebug("🟢 Icône System Tray passée en mode NORMAL");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Erreur mise à jour icône: {ex.Message}");
+                LogDebug($"❌ Erreur mise à jour icône: {ex.Message}");
             }
         }
         
@@ -620,7 +624,7 @@ namespace Panosse
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Erreur affichage explication: {ex.Message}");
+                LogDebug($"❌ Erreur affichage explication: {ex.Message}");
             }
         }
         
@@ -651,11 +655,11 @@ namespace Panosse
                         separatorPourquoi.Visible = false;
                 }
                 
-                System.Diagnostics.Debug.WriteLine("🟢 Icône remise sur PROPRE après nettoyage");
+                LogDebug("🟢 Icône remise sur PROPRE après nettoyage");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Erreur reset icône: {ex.Message}");
+                LogDebug($"❌ Erreur reset icône: {ex.Message}");
             }
         }
         
@@ -684,16 +688,16 @@ namespace Panosse
                 
                 if (success)
                 {
-                    System.Diagnostics.Debug.WriteLine("✅ Raccourci Ctrl+Alt+P enregistré avec succès");
+                    LogDebug("✅ Raccourci Ctrl+Alt+P enregistré avec succès");
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine("❌ Échec de l'enregistrement du raccourci");
+                    LogDebug("❌ Échec de l'enregistrement du raccourci");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Erreur lors de l'enregistrement du HotKey: {ex.Message}");
+                LogDebug($"❌ Erreur lors de l'enregistrement du HotKey: {ex.Message}");
             }
         }
         
@@ -716,7 +720,7 @@ namespace Panosse
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Erreur lors du désenregistrement du HotKey: {ex.Message}");
+                LogDebug($"❌ Erreur lors du désenregistrement du HotKey: {ex.Message}");
             }
         }
         
@@ -736,7 +740,7 @@ namespace Panosse
                     handled = true;
                     
                     // Lancer le nettoyage en arrière-plan
-                    System.Diagnostics.Debug.WriteLine("🔥 Ctrl+Alt+P détecté ! Lancement du nettoyage en arrière-plan...");
+                    LogDebug("🔥 Ctrl+Alt+P détecté ! Lancement du nettoyage en arrière-plan...");
                     LancerNettoyageArrierePlan();
                 }
             }
@@ -770,7 +774,7 @@ namespace Panosse
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"❌ Erreur pendant le nettoyage en arrière-plan: {ex.Message}");
+                    LogDebug($"❌ Erreur pendant le nettoyage en arrière-plan: {ex.Message}");
                 }
             });
         }
@@ -840,11 +844,11 @@ namespace Panosse
                 // Convertir en Mo
                 espaceLibereMo = tailleTotal / (1024 * 1024);
                 
-                System.Diagnostics.Debug.WriteLine($"✅ Nettoyage terminé : {espaceLibereMo} Mo libérés");
+                LogDebug($"✅ Nettoyage terminé : {espaceLibereMo} Mo libérés");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Erreur pendant le nettoyage: {ex.Message}");
+                LogDebug($"❌ Erreur pendant le nettoyage: {ex.Message}");
                 // En cas d'erreur, on met une valeur minimale
                 espaceLibereMo = 0;
             }
@@ -862,7 +866,7 @@ namespace Panosse
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Impossible de jouer le son: {ex.Message}");
+                LogDebug($"❌ Impossible de jouer le son: {ex.Message}");
             }
         }
         
@@ -890,7 +894,7 @@ namespace Panosse
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Impossible d'afficher la notification: {ex.Message}");
+                LogDebug($"❌ Impossible d'afficher la notification: {ex.Message}");
             }
         }
         
