@@ -23,10 +23,10 @@
     <Version>2.0.0</Version>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
     <FileVersion>2.0.0.0</FileVersion>
-    <Company>Panosse</Company>
-    <Product>Panosse - Nettoyeur PC</Product>
-    <Copyright>Copyright © 2025</Copyright>
-    <Description>Application de nettoyage automatique pour Windows</Description>
+    <Company>Marco</Company>
+    <Product>Panosse - La serpillère numérique</Product>
+    <Copyright>Copyright © 2026 Marco</Copyright>
+    <Description>La serpillère numérique pour un PC tout propre</Description>
   </PropertyGroup>
 
   <!-- Configuration Debug/Release optimisée -->
