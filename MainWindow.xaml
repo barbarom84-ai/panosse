@@ -122,22 +122,22 @@
             
             <!-- Menu Fichier -->
             <MenuItem Header="📁 _Fichier" FontSize="12" Padding="10,5">
-                <MenuItem Header="🔄 _Actualiser la détection" Click="MenuItem_Actualiser_Click" />
+                <MenuItem Header="🔄 _Actualiser la détection" Command="{Binding RefreshDetectionCommand}" />
                 <Separator />
-                <MenuItem Header="🗕 _Réduire dans la barre des tâches" Click="BtnQuitter_Click" InputGestureText="Échap"/>
-                <MenuItem Header="❌ _Quitter définitivement" Click="MenuItem_QuitterDefinitivement_Click" InputGestureText="Alt+F4"/>
+                <MenuItem Header="🗕 _Réduire dans la barre des tâches" Command="{Binding MinimizeToTrayCommand}" InputGestureText="Échap"/>
+                <MenuItem Header="❌ _Quitter définitivement" Command="{Binding QuitCommand}" InputGestureText="Alt+F4"/>
             </MenuItem>
             
             <!-- Menu Outils -->
             <MenuItem Header="🔧 _Outils" FontSize="12" Padding="10,5">
-                <MenuItem Header="🔍 _Vérifier les mises à jour" Click="BtnRechercherMAJ_Click" />
+                <MenuItem Header="🔍 _Vérifier les mises à jour" Command="{Binding CheckUpdatesCommand}" />
                 <Separator />
-                <MenuItem Header="🌐 _Ouvrir le dépôt GitHub" Click="MenuItem_GitHub_Click" />
+                <MenuItem Header="🌐 _Ouvrir le dépôt GitHub" Command="{Binding OpenGitHubCommand}" />
             </MenuItem>
             
             <!-- Menu Aide -->
             <MenuItem Header="❓ _Aide" FontSize="12" Padding="10,5">
-                <MenuItem Header="ℹ️ _À propos de Panosse" Click="BtnAPropos_Click" InputGestureText="F1"/>
+                <MenuItem Header="ℹ️ _À propos de Panosse" Command="{Binding OpenAboutCommand}" InputGestureText="F1"/>
             </MenuItem>
         </Menu>
         
@@ -181,7 +181,7 @@
                     <Button x:Name="BtnMettreAJour"
                             Grid.Column="1"
                             Content="Mettre à jour"
-                            Click="BtnMettreAJour_Click"
+                            Command="{Binding InstallUpdateCommand}"
                             Background="White"
                             Foreground="#4CAF50"
                             BorderThickness="0"
@@ -217,7 +217,7 @@
                     <Button x:Name="BtnFermerUpdate"
                             Grid.Column="2"
                             Content="×"
-                            Click="BtnFermerUpdate_Click"
+                            Command="{Binding CloseUpdateBarCommand}"
                             Background="Transparent"
                             Foreground="White"
                             BorderThickness="0"
@@ -272,7 +272,7 @@
                 VerticalAlignment="Top" 
                 Margin="0,5,5,0"
                 Panel.ZIndex="11"
-                Click="BtnQuitter_Click"/>
+                Command="{Binding MinimizeToTrayCommand}"/>
 
         <!-- Titre -->
         <TextBlock Text="Panosse" 
@@ -293,7 +293,7 @@
                     Style="{StaticResource CircleButtonStyle}" 
                     Width="150" 
                     Height="150"
-                    Click="BtnNettoyer_Click"
+                    Command="{Binding CleanCommand}"
                     RenderTransformOrigin="0.5,0.5">
                 <Button.RenderTransform>
                     <ScaleTransform ScaleX="1" ScaleY="1"/>
@@ -376,14 +376,17 @@
             <Border Background="White"
                     CornerRadius="15"
                     Width="320"
-                    MaxHeight="400"
+                    MaxHeight="500"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Center"
-                    Padding="30,25,30,25">
+                    Padding="24,20,24,20">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.3"/>
                 </Border.Effect>
-                
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              MaxHeight="440">
                 <StackPanel>
                     <!-- Logo et nom -->
                     <Image Source="pack://application:,,,/assets/panosse.png"
@@ -409,9 +412,9 @@
                     
                     <!-- Bouton Vérifier les mises à jour avec largeur fixe -->
                     <Button x:Name="BtnRechercherMAJ"
-                            Content="🔍 Vérifier les mises à jour"
-                            Click="BtnRechercherMAJ_Click"
-                            Background="#4CAF50"
+                            Content="{Binding CheckUpdatesButtonText}"
+                            Command="{Binding CheckUpdatesCommand}"
+                            Background="{Binding CheckUpdatesButtonBackground}"
                             Foreground="White"
                             BorderThickness="0"
                             Padding="12,8"
@@ -420,8 +423,8 @@
                             Cursor="Hand"
                             HorizontalAlignment="Center"
                             Width="200"
-                            Margin="0,0,0,20"
-                            IsEnabled="True">
+                            Margin="0,0,0,12"
+                            IsEnabled="{Binding IsCheckUpdatesButtonEnabled}">
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Background" Value="#4CAF50"/>
@@ -458,6 +461,12 @@
                             </Style>
                         </Button.Style>
                     </Button>
+
+                    <TextBlock Text="{Binding LastUpdateCheckText}"
+                               FontSize="11"
+                               Foreground="#9E9E9E"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,12"/>
                     
                     <!-- Slogan -->
                     <TextBlock Text="La serpillère numérique"
@@ -472,12 +481,12 @@
                                FontWeight="SemiBold"
                                Foreground="#424242"
                                HorizontalAlignment="Center"
-                               Margin="0,0,0,25"/>
+                               Margin="0,0,0,20"/>
                     
                     <!-- Séparateur -->
                     <Border Height="1"
                             Background="#E0E0E0"
-                            Margin="0,0,0,20"/>
+                            Margin="0,0,0,15"/>
                     
                     <!-- Développeur -->
                     <TextBlock Text="Développé par"
@@ -491,12 +500,12 @@
                                FontWeight="SemiBold"
                                Foreground="#424242"
                                HorizontalAlignment="Center"
-                               Margin="0,0,0,15"/>
+                               Margin="0,0,0,12"/>
                     
                     <!-- Lien GitHub -->
                     <TextBlock x:Name="LinkGitHub"
                                HorizontalAlignment="Center"
-                               Margin="0,0,0,30">
+                               Margin="0,0,0,20">
                         <Hyperlink NavigateUri="https://github.com/barbarom84-ai/panosse"
                                    RequestNavigate="Hyperlink_RequestNavigate"
                                    Foreground="#2196F3"
@@ -507,7 +516,7 @@
                     
                     <!-- Bouton Retour -->
                     <Button Content="Retour"
-                            Click="BtnRetourAPropos_Click"
+                            Command="{Binding CloseAboutCommand}"
                             Background="#2196F3"
                             Foreground="White"
                             BorderThickness="0"
@@ -515,7 +524,8 @@
                             FontSize="14"
                             FontWeight="SemiBold"
                             Cursor="Hand"
-                            HorizontalAlignment="Center">
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,4">
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Background" Value="#2196F3"/>
@@ -543,6 +553,7 @@
                         </Button.Style>
                     </Button>
                 </StackPanel>
+                </ScrollViewer>
             </Border>
         </Grid>
     </Grid>

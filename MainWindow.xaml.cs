@@ -118,6 +118,7 @@ namespace Panosse
                 DataContext = viewModel;
                 cleanupService = new CleanupService();
                 updateService = new UpdateService();
+                ConfigurerCommandes();
                 
                 Loaded += MainWindow_Loaded;
                 LogDebug("Constructeur - Loaded event ajouté");
@@ -133,6 +134,20 @@ namespace Panosse
                 LogDebug($"Constructeur - ERREUR: {ex.Message}");
                 throw;
             }
+        }
+
+        private void ConfigurerCommandes()
+        {
+            viewModel.CleanCommand = new AsyncRelayCommand(ExecuteCleaningAsync);
+            viewModel.MinimizeToTrayCommand = new RelayCommand(() => BtnQuitter_Click(this, new RoutedEventArgs()));
+            viewModel.QuitCommand = new RelayCommand(() => MenuItem_QuitterDefinitivement_Click(this, new RoutedEventArgs()));
+            viewModel.OpenAboutCommand = new RelayCommand(() => BtnAPropos_Click(this, new RoutedEventArgs()));
+            viewModel.CloseAboutCommand = new RelayCommand(() => BtnRetourAPropos_Click(this, new RoutedEventArgs()));
+            viewModel.RefreshDetectionCommand = new RelayCommand(() => MenuItem_Actualiser_Click(this, new RoutedEventArgs()));
+            viewModel.OpenGitHubCommand = new RelayCommand(() => MenuItem_GitHub_Click(this, new RoutedEventArgs()));
+            viewModel.CheckUpdatesCommand = new AsyncRelayCommand(ExecuteCheckUpdatesAsync);
+            viewModel.InstallUpdateCommand = new AsyncRelayCommand(ExecuteInstallUpdateAsync);
+            viewModel.CloseUpdateBarCommand = new RelayCommand(() => BtnFermerUpdate_Click(this, new RoutedEventArgs()));
         }
 
         /// <summary>
@@ -153,8 +168,7 @@ namespace Panosse
             menuNettoyer.Click += (s, e) => 
             {
                 AfficherFenetre();
-                // Simuler un clic sur le bouton de nettoyage
-                Dispatcher.Invoke(() => BtnNettoyer_Click(null!, null!));
+                Dispatcher.Invoke(() => _ = ExecuteCleaningAsync());
             };
             contextMenu.Items.Add(menuNettoyer);
             
@@ -1197,6 +1211,11 @@ namespace Panosse
 
         private async void BtnNettoyer_Click(object sender, RoutedEventArgs e)
         {
+            await ExecuteCleaningAsync();
+        }
+
+        private async Task ExecuteCleaningAsync()
+        {
             // Désactiver le bouton pendant le nettoyage
             BtnNettoyer.IsEnabled = false;
             viewModel.ButtonText = "Nettoyage en cours...";
@@ -1681,6 +1700,11 @@ namespace Panosse
         /// </summary>
         private async void BtnMettreAJour_Click(object sender, RoutedEventArgs e)
         {
+            await ExecuteInstallUpdateAsync();
+        }
+
+        private async Task ExecuteInstallUpdateAsync()
+        {
             if (string.IsNullOrEmpty(downloadUrl))
             {
                 // Fallback : ouvrir la page GitHub si pas d'URL de téléchargement
@@ -1898,9 +1922,16 @@ REM Supprimer le script lui-même
         /// </summary>
         private async void BtnRechercherMAJ_Click(object sender, RoutedEventArgs e)
         {
+            await ExecuteCheckUpdatesAsync();
+        }
+
+        private async Task ExecuteCheckUpdatesAsync()
+        {
             // Désactiver le bouton pendant la vérification
-            BtnRechercherMAJ.IsEnabled = false;
-            BtnRechercherMAJ.Content = "Vérification...";
+            viewModel.IsCheckUpdatesButtonEnabled = false;
+            viewModel.CheckUpdatesButtonText = "Vérification...";
+            viewModel.CheckUpdatesButtonBackground = new SolidColorBrush(Color.FromRgb(76, 175, 80));
+            viewModel.LastUpdateCheckText = $"Dernière vérification : {DateTime.Now:HH:mm:ss} (en cours)";
 
             try
             {
@@ -1920,9 +1951,10 @@ REM Supprimer le script lui-même
                 if (verificationEchouee)
                 {
                     // La vérification a échoué (pas de connexion, GitHub inaccessible, etc.)
-                    BtnRechercherMAJ.Content = "⚠️ Vérification impossible\n(vérifiez votre connexion)";
-                    BtnRechercherMAJ.Background = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
-                    BtnRechercherMAJ.IsEnabled = true; // Permettre de réessayer
+                    viewModel.CheckUpdatesButtonText = "⚠️ Vérification impossible\n(vérifiez votre connexion)";
+                    viewModel.CheckUpdatesButtonBackground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
+                    viewModel.IsCheckUpdatesButtonEnabled = true; // Permettre de réessayer
+                    viewModel.LastUpdateCheckText = $"Dernière vérification : {DateTime.Now:HH:mm:ss} (échec)";
                     
                     // Pas de MessageBox - L'utilisateur peut continuer normalement
                     // Il peut réessayer plus tard en cliquant à nouveau sur le bouton
@@ -1930,8 +1962,10 @@ REM Supprimer le script lui-même
                 else if (estAJour)
                 {
                     // Aucune mise à jour disponible
-                    BtnRechercherMAJ.Content = "✅ Version à jour";
-                    BtnRechercherMAJ.Background = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
+                    viewModel.CheckUpdatesButtonText = "✅ Version à jour";
+                    viewModel.CheckUpdatesButtonBackground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
+                    viewModel.IsCheckUpdatesButtonEnabled = true;
+                    viewModel.LastUpdateCheckText = $"Dernière vérification : {DateTime.Now:HH:mm:ss} (à jour)";
                     
                     // Afficher un message de confirmation
                     await Task.Delay(100);
@@ -1966,15 +2000,24 @@ REM Supprimer le script lui-même
                         await Task.Delay(300);
                         
                         // Lancer le téléchargement et l'installation
-                        BtnRechercherMAJ.Content = "Téléchargement...";
+                        viewModel.CheckUpdatesButtonText = "Téléchargement...";
                         await TelechargerEtInstallerMiseAJour();
                     }
                     else
                     {
                         // L'utilisateur a refusé
-                        BtnRechercherMAJ.Content = "🔍 Vérifier les mises à jour";
-                        BtnRechercherMAJ.IsEnabled = true;
+                        viewModel.CheckUpdatesButtonText = "🔍 Vérifier les mises à jour";
+                        viewModel.IsCheckUpdatesButtonEnabled = true;
+                        viewModel.LastUpdateCheckText = $"Dernière vérification : {DateTime.Now:HH:mm:ss} (mise à jour disponible)";
                     }
+                }
+                else
+                {
+                    // Mise à jour détectée mais sans lien .exe direct
+                    viewModel.CheckUpdatesButtonText = "🌐 Ouvrir la page release";
+                    viewModel.CheckUpdatesButtonBackground = new SolidColorBrush(Color.FromRgb(33, 150, 243)); // Bleu
+                    viewModel.IsCheckUpdatesButtonEnabled = true;
+                    viewModel.LastUpdateCheckText = $"Dernière vérification : {DateTime.Now:HH:mm:ss} (mise à jour disponible)";
                 }
                 // Note : Le cas "verificationEchouee" est déjà géré plus haut
                 // Plus besoin de ce else final car on gère l'erreur silencieusement
@@ -1983,9 +2026,10 @@ REM Supprimer le script lui-même
             {
                 // Erreur inattendue lors du clic sur le bouton
                 // Afficher le bouton avec un message d'erreur
-                BtnRechercherMAJ.Content = "⚠️ Vérification impossible\n(vérifiez votre connexion)";
-                BtnRechercherMAJ.Background = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
-                BtnRechercherMAJ.IsEnabled = true;
+                viewModel.CheckUpdatesButtonText = "⚠️ Vérification impossible\n(vérifiez votre connexion)";
+                viewModel.CheckUpdatesButtonBackground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
+                viewModel.IsCheckUpdatesButtonEnabled = true;
+                viewModel.LastUpdateCheckText = $"Dernière vérification : {DateTime.Now:HH:mm:ss} (erreur)";
                 
                 // Ne pas afficher de MessageBox - rester silencieux
                 // L'utilisateur peut réessayer en recliquant

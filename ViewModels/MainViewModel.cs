@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Input;
 
 namespace Panosse.ViewModels;
 
@@ -19,10 +20,25 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string updateMessage = "Une nouvelle version est disponible !";
     private Visibility downloadProgressVisibility = Visibility.Collapsed;
     private double downloadProgressValue;
+    private string checkUpdatesButtonText = "🔍 Vérifier les mises à jour";
+    private Brush checkUpdatesButtonBackground = new SolidColorBrush(Color.FromRgb(76, 175, 80));
+    private bool isCheckUpdatesButtonEnabled = true;
+    private string lastUpdateCheckText = "Dernière vérification : jamais";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<string> TaskMessages { get; } = new();
+
+    public ICommand? CleanCommand { get; set; }
+    public ICommand? MinimizeToTrayCommand { get; set; }
+    public ICommand? QuitCommand { get; set; }
+    public ICommand? OpenAboutCommand { get; set; }
+    public ICommand? CloseAboutCommand { get; set; }
+    public ICommand? RefreshDetectionCommand { get; set; }
+    public ICommand? OpenGitHubCommand { get; set; }
+    public ICommand? CheckUpdatesCommand { get; set; }
+    public ICommand? InstallUpdateCommand { get; set; }
+    public ICommand? CloseUpdateBarCommand { get; set; }
 
     public string ButtonText
     {
@@ -88,6 +104,30 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         get => downloadProgressValue;
         set => SetField(ref downloadProgressValue, value);
+    }
+
+    public string CheckUpdatesButtonText
+    {
+        get => checkUpdatesButtonText;
+        set => SetField(ref checkUpdatesButtonText, value);
+    }
+
+    public Brush CheckUpdatesButtonBackground
+    {
+        get => checkUpdatesButtonBackground;
+        set => SetField(ref checkUpdatesButtonBackground, value);
+    }
+
+    public bool IsCheckUpdatesButtonEnabled
+    {
+        get => isCheckUpdatesButtonEnabled;
+        set => SetField(ref isCheckUpdatesButtonEnabled, value);
+    }
+
+    public string LastUpdateCheckText
+    {
+        get => lastUpdateCheckText;
+        set => SetField(ref lastUpdateCheckText, value);
     }
 
     private void SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
