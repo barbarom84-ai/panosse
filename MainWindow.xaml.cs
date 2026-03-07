@@ -1135,7 +1135,7 @@ namespace Panosse
                     if (element != null)
                     {
                         // Rechercher si l'élément ou un parent est un contrôle interactif
-                        DependencyObject current = element;
+                        DependencyObject? current = element;
                         while (current != null && current != this)
                         {
                             if (current is Button || 
@@ -1144,7 +1144,7 @@ namespace Panosse
                             {
                                 return; // Ne pas déplacer la fenêtre
                             }
-                            current = VisualTreeHelper.GetParent(current);
+                            current = GetParentSafe(current);
                         }
                     }
                     
@@ -1173,7 +1173,7 @@ namespace Panosse
                 {
                     return;
                 }
-                current = VisualTreeHelper.GetParent(current);
+                current = GetParentSafe(current);
             }
 
             try
@@ -1185,6 +1185,22 @@ namespace Panosse
             {
                 // Ignorer les cas où DragMove ne peut pas démarrer.
             }
+        }
+
+        private static DependencyObject? GetParentSafe(DependencyObject current)
+        {
+            // VisualTreeHelper only works for Visual/Visual3D.
+            if (current is Visual || current is System.Windows.Media.Media3D.Visual3D)
+            {
+                return VisualTreeHelper.GetParent(current);
+            }
+
+            if (current is FrameworkContentElement contentElement)
+            {
+                return contentElement.Parent;
+            }
+
+            return LogicalTreeHelper.GetParent(current);
         }
 
         private void BtnQuitter_Click(object sender, RoutedEventArgs e)
