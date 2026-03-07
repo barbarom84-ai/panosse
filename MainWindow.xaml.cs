@@ -1140,7 +1140,6 @@ namespace Panosse
                         {
                             if (current is Button || 
                                 current is MenuItem || 
-                                current is Menu ||
                                 current is System.Windows.Controls.Primitives.Popup)
                             {
                                 return; // Ne pas déplacer la fenêtre
@@ -1155,6 +1154,36 @@ namespace Panosse
             catch
             {
                 // Ignore les erreurs si DragMove est appelé dans un contexte invalide
+            }
+        }
+
+        private void MainMenu_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != System.Windows.Input.MouseButton.Left)
+            {
+                return;
+            }
+
+            // Permet de déplacer la fenêtre depuis la barre de menu,
+            // sauf lorsqu'on clique sur un item menu ou un bouton interactif.
+            DependencyObject? current = e.OriginalSource as DependencyObject;
+            while (current != null)
+            {
+                if (current is MenuItem || current is Button)
+                {
+                    return;
+                }
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            try
+            {
+                DragMove();
+                e.Handled = true;
+            }
+            catch
+            {
+                // Ignorer les cas où DragMove ne peut pas démarrer.
             }
         }
 
@@ -1738,10 +1767,10 @@ namespace Panosse
             UpdateBar.Visibility = Visibility.Visible;
             
             // Animation de slide-in + fade-in
-            var slideAnimation = new ThicknessAnimation
+            var slideAnimation = new DoubleAnimation
             {
-                From = new Thickness(0, -40, 0, 0),
-                To = new Thickness(0, 0, 0, 0),
+                From = -40,
+                To = 0,
                 Duration = TimeSpan.FromSeconds(0.4),
                 EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
             };
@@ -1753,7 +1782,12 @@ namespace Panosse
                 Duration = TimeSpan.FromSeconds(0.4)
             };
             
-            UpdateBar.BeginAnimation(MarginProperty, slideAnimation);
+            UpdateBar.BeginAnimation(RenderTransformProperty, null);
+            if (UpdateBar.RenderTransform is not TranslateTransform)
+            {
+                UpdateBar.RenderTransform = new TranslateTransform();
+            }
+            ((TranslateTransform)UpdateBar.RenderTransform).BeginAnimation(TranslateTransform.YProperty, slideAnimation);
             UpdateBar.BeginAnimation(OpacityProperty, fadeAnimation);
         }
 
@@ -1762,9 +1796,9 @@ namespace Panosse
         /// </summary>
         private void MasquerBarreMiseAJour()
         {
-            var slideAnimation = new ThicknessAnimation
+            var slideAnimation = new DoubleAnimation
             {
-                To = new Thickness(0, -40, 0, 0),
+                To = -40,
                 Duration = TimeSpan.FromSeconds(0.3),
                 EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
             };
@@ -1780,7 +1814,11 @@ namespace Panosse
                 UpdateBar.Visibility = Visibility.Collapsed;
             };
             
-            UpdateBar.BeginAnimation(MarginProperty, slideAnimation);
+            if (UpdateBar.RenderTransform is not TranslateTransform)
+            {
+                UpdateBar.RenderTransform = new TranslateTransform();
+            }
+            ((TranslateTransform)UpdateBar.RenderTransform).BeginAnimation(TranslateTransform.YProperty, slideAnimation);
             UpdateBar.BeginAnimation(OpacityProperty, fadeAnimation);
         }
 
