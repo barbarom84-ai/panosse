@@ -170,7 +170,7 @@
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="🔔" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
                         <TextBlock x:Name="UpdateMessage"
-                                   Text="Une nouvelle version est disponible !"
+                                   Text="{Binding UpdateMessage}"
                                    FontSize="13"
                                    FontWeight="SemiBold"
                                    Foreground="White"
@@ -256,8 +256,8 @@
                              Height="3"
                              Minimum="0"
                              Maximum="100"
-                             Value="0"
-                             Visibility="Collapsed"
+                             Value="{Binding DownloadProgressValue}"
+                             Visibility="{Binding DownloadProgressVisibility}"
                              Margin="0,5,0,0"
                              Background="Transparent"
                              Foreground="White"
@@ -309,7 +309,7 @@
 
             <!-- Texte sous le bouton -->
             <TextBlock x:Name="BtnText"
-                       Text="Passer la panosse" 
+                       Text="{Binding ButtonText}" 
                        FontSize="18" 
                        FontWeight="SemiBold"
                        Foreground="#424242" 
@@ -324,8 +324,10 @@
                          Style="{StaticResource ModernProgressBar}"
                          Minimum="0" 
                          Maximum="100" 
-                         Value="0" 
-                         Visibility="Collapsed"
+                         Value="{Binding ProgressValue}" 
+                         Visibility="{Binding ProgressVisibility}"
+                         IsIndeterminate="{Binding IsProgressIndeterminate}"
+                         Foreground="{Binding ProgressForeground}"
                          Margin="0,0,0,10"/>
 
             <!-- Liste des tâches -->
@@ -336,7 +338,8 @@
                           Visibility="Collapsed"
                           Opacity="0"
                           Margin="0,0,0,10">
-                <ItemsControl x:Name="TaskList">
+                <ItemsControl x:Name="TaskList"
+                              ItemsSource="{Binding TaskMessages}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding}" 
@@ -352,9 +355,9 @@
 
             <!-- Message de statut -->
             <TextBlock x:Name="StatusText" 
-                       Text="" 
+                       Text="{Binding StatusText}" 
                        FontSize="14" 
-                       Foreground="#757575" 
+                       Foreground="{Binding StatusForeground}" 
                        TextAlignment="Center" 
                        TextWrapping="Wrap"
                        HorizontalAlignment="Center"
@@ -398,7 +401,7 @@
                     
                     <!-- Version centrée -->
                     <TextBlock x:Name="VersionText"
-                               Text="v1.0.0"
+                               Text="{Binding VersionText}"
                                FontSize="14"
                                Foreground="#9E9E9E"
                                HorizontalAlignment="Center"

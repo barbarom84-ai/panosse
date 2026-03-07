@@ -1,5 +1,4 @@
 using System;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -7,13 +6,13 @@ using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using Microsoft.Win32;
+using Panosse.Services;
+using Panosse.ViewModels;
 using Forms = System.Windows.Forms;
 using Drawing = System.Drawing;
 
@@ -21,10 +20,6 @@ namespace Panosse
 {
     public partial class MainWindow : Window
     {
-        // Import pour vider la corbeille nativement
-        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
-        static extern int SHEmptyRecycleBin(IntPtr hwnd, string rootPath, uint flags);
-        
         // Imports pour RegisterHotKey (raccourci clavier global)
         [DllImport("user32.dll")]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -72,7 +67,7 @@ namespace Panosse
         }
 
         private Storyboard? pulseStoryboard;
-        private ObservableCollection<string> taskMessages = new ObservableCollection<string>();
+        private readonly MainViewModel viewModel;
         private int etapesCourantes = 0;
         private int etapesTotales = 8;
         
@@ -108,6 +103,8 @@ namespace Panosse
         private const double SEUIL_TAILLE_GO = 5.0;
         private const long SEUIL_FICHIER_GROS_MO = 200;
         private const int SEUIL_JOURS_ANCIEN = 30;
+        private readonly ICleanupService cleanupService;
+        private readonly IUpdateService updateService;
 
         public MainWindow()
         {
@@ -117,15 +114,16 @@ namespace Panosse
                 
                 InitializeComponent();
                 LogDebug("Constructeur - InitializeComponent OK");
+                viewModel = new MainViewModel();
+                DataContext = viewModel;
+                cleanupService = new CleanupService();
+                updateService = new UpdateService();
                 
                 Loaded += MainWindow_Loaded;
                 LogDebug("Constructeur - Loaded event ajouté");
-                
-                TaskList.ItemsSource = taskMessages;
-                LogDebug("Constructeur - TaskList configuré");
-                
+
                 // Définir la version dynamiquement depuis l'assembly
-                VersionText.Text = $"v{VERSION_ACTUELLE}";
+                viewModel.VersionText = $"v{VERSION_ACTUELLE}";
                 LogDebug($"Constructeur - Version définie: {VERSION_ACTUELLE}");
                 
                 LogDebug("Constructeur - Fin (succès)");
@@ -789,57 +787,28 @@ namespace Panosse
             try
             {
                 // 1. Vider la corbeille
-                await Task.Run(() =>
-                {
-                    try
-                    {
-                        SHEmptyRecycleBin(IntPtr.Zero, string.Empty, 1 | 2 | 4);
-                    }
-                    catch { }
-                });
+                await cleanupService.EmptyRecycleBinAsync();
                 
                 // 2. Nettoyer les fichiers temporaires
-                tailleTotal += await Task.Run(() =>
-                {
-                    long size = 0;
-                    size += NettoyerDossier(Path.GetTempPath());
-                    size += NettoyerDossier(@"C:\Windows\Temp");
-                    return size;
-                });
+                tailleTotal += await Task.Run(() => cleanupService.CleanTemporaryFiles());
                 
                 // 3. Cache Chrome
-                tailleTotal += await Task.Run(() =>
-                {
-                    long size = 0;
-                    string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                    size += NettoyerDossier(Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Cache"));
-                    size += NettoyerDossier(Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Cache\Cache_Data"));
-                    size += NettoyerDossier(Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Code Cache"));
-                    return size;
-                });
+                tailleTotal += await Task.Run(() => cleanupService.CleanChromeCache());
                 
                 // 4. Cache Edge
-                tailleTotal += await Task.Run(() =>
-                {
-                    long size = 0;
-                    string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                    size += NettoyerDossier(Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Cache"));
-                    size += NettoyerDossier(Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Cache\Cache_Data"));
-                    size += NettoyerDossier(Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Code Cache"));
-                    return size;
-                });
+                tailleTotal += await Task.Run(() => cleanupService.CleanEdgeCache());
                 
                 // 5. Nettoyer le registre
-                await Task.Run(() => NettoyerRegistre());
+                await Task.Run(() => cleanupService.CleanRegistry());
                 
                 // 6. Nettoyer les téléchargements
-                tailleTotal += await Task.Run(() => NettoyerTelechargements());
+                tailleTotal += await Task.Run(() => cleanupService.CleanOldDownloads());
                 
                 // 7. Nettoyer les logs Windows
-                tailleTotal += await Task.Run(() => NettoyerLogsWindows());
+                tailleTotal += await Task.Run(() => cleanupService.CleanWindowsLogs());
                 
                 // 8. Nettoyer le cache des miniatures
-                tailleTotal += await Task.Run(() => NettoyerCacheMiniatures());
+                tailleTotal += await Task.Run(() => cleanupService.CleanThumbnailCache());
                 
                 // Convertir en Mo
                 espaceLibereMo = tailleTotal / (1024 * 1024);
@@ -922,8 +891,8 @@ namespace Panosse
                 if (navigateursEnCours.Count > 0)
                 {
                     string browsers = string.Join(" et ", navigateursEnCours);
-                    StatusText.Text = $"⚠️ Veuillez fermer {browsers} pour un nettoyage complet (cliquez ici pour fermer automatiquement)";
-                    StatusText.Foreground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
+                    viewModel.StatusText = $"⚠️ Veuillez fermer {browsers} pour un nettoyage complet (cliquez ici pour fermer automatiquement)";
+                    viewModel.StatusForeground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
                     StatusText.Cursor = System.Windows.Input.Cursors.Hand; // Cursor main pour indiquer que c'est cliquable
                     StatusText.TextDecorations = TextDecorations.Underline; // Souligner pour indiquer que c'est cliquable
             }
@@ -1035,29 +1004,29 @@ namespace Panosse
                 if (navigateursEnCours.Count == 0)
                 {
                     // Tous les navigateurs sont fermés
-                    StatusText.Text = "✅ Navigateurs fermés ! Vous pouvez maintenant nettoyer en toute sécurité.";
-                    StatusText.Foreground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
+                    viewModel.StatusText = "✅ Navigateurs fermés ! Vous pouvez maintenant nettoyer en toute sécurité.";
+                    viewModel.StatusForeground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
                     StatusText.Cursor = System.Windows.Input.Cursors.Arrow;
                     StatusText.TextDecorations = null;
                     
                     // Cacher le message après 5 secondes
                     await Task.Delay(5000);
-                    StatusText.Text = "";
+                    viewModel.StatusText = "";
                 }
                 else
                 {
                     // Certains navigateurs sont encore ouverts
                     string browsers = string.Join(" et ", navigateursEnCours);
-                    StatusText.Text = $"⚠️ {browsers} n'a pas pu être fermé. Fermez-le manuellement.";
-                    StatusText.Foreground = new SolidColorBrush(Color.FromRgb(244, 67, 54)); // Rouge
+                    viewModel.StatusText = $"⚠️ {browsers} n'a pas pu être fermé. Fermez-le manuellement.";
+                    viewModel.StatusForeground = new SolidColorBrush(Color.FromRgb(244, 67, 54)); // Rouge
                     StatusText.Cursor = System.Windows.Input.Cursors.Arrow;
                     StatusText.TextDecorations = null;
                 }
             }
             catch (Exception ex)
             {
-                StatusText.Text = $"❌ Erreur lors de la fermeture : {ex.Message}";
-                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(244, 67, 54)); // Rouge
+                viewModel.StatusText = $"❌ Erreur lors de la fermeture : {ex.Message}";
+                viewModel.StatusForeground = new SolidColorBrush(Color.FromRgb(244, 67, 54)); // Rouge
                 StatusText.Cursor = System.Windows.Input.Cursors.Arrow;
                 StatusText.TextDecorations = null;
             }
@@ -1148,15 +1117,15 @@ namespace Panosse
             if (navigateursEnCours.Count > 0)
             {
                 string browsers = string.Join(" et ", navigateursEnCours);
-                StatusText.Text = $"⚠️ Veuillez fermer {browsers} pour un nettoyage complet (cliquez ici pour fermer automatiquement)";
-                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
+                viewModel.StatusText = $"⚠️ Veuillez fermer {browsers} pour un nettoyage complet (cliquez ici pour fermer automatiquement)";
+                viewModel.StatusForeground = new SolidColorBrush(Color.FromRgb(255, 152, 0)); // Orange
                 StatusText.Cursor = System.Windows.Input.Cursors.Hand;
                 StatusText.TextDecorations = TextDecorations.Underline;
             }
             else
             {
-                StatusText.Text = "✅ Aucun navigateur ouvert. Vous pouvez nettoyer en toute sécurité !";
-                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
+                viewModel.StatusText = "✅ Aucun navigateur ouvert. Vous pouvez nettoyer en toute sécurité !";
+                viewModel.StatusForeground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
                 StatusText.Cursor = System.Windows.Input.Cursors.Arrow;
                 StatusText.TextDecorations = null;
                 
@@ -1164,7 +1133,7 @@ namespace Panosse
                 Task.Run(async () =>
                 {
                     await Task.Delay(3000);
-                    await Dispatcher.InvokeAsync(() => StatusText.Text = "");
+                    await Dispatcher.InvokeAsync(() => viewModel.StatusText = "");
                 });
             }
         }
@@ -1230,19 +1199,19 @@ namespace Panosse
         {
             // Désactiver le bouton pendant le nettoyage
             BtnNettoyer.IsEnabled = false;
-            BtnText.Text = "Nettoyage en cours...";
-            StatusText.Text = "Préparation...";
-            StatusText.Foreground = new SolidColorBrush(Color.FromRgb(117, 117, 117)); // Gris
+            viewModel.ButtonText = "Nettoyage en cours...";
+            viewModel.StatusText = "Préparation...";
+            viewModel.StatusForeground = new SolidColorBrush(Color.FromRgb(117, 117, 117)); // Gris
             
             // Réinitialiser et afficher la barre de progression
-            PrgBar.Visibility = Visibility.Visible;
-            PrgBar.IsIndeterminate = false;
-            PrgBar.Value = 0;
-            PrgBar.Foreground = new SolidColorBrush(Color.FromRgb(33, 150, 243)); // Bleu (couleur par défaut)
+            viewModel.ProgressVisibility = Visibility.Visible;
+            viewModel.IsProgressIndeterminate = false;
+            viewModel.ProgressValue = 0;
+            viewModel.ProgressForeground = new SolidColorBrush(Color.FromRgb(33, 150, 243)); // Bleu (couleur par défaut)
             
             // Afficher et réinitialiser la liste des tâches
             TaskScrollViewer.Visibility = Visibility.Visible;
-            taskMessages.Clear();
+            viewModel.TaskMessages.Clear();
             etapesCourantes = 0;
 
             // Animer l'apparition de la liste des tâches avec un fondu fluide
@@ -1260,16 +1229,16 @@ namespace Panosse
             double moLiberes = Math.Round(octetsLiberes / 1024.0 / 1024.0, 2);
             
             // Changer la couleur de la barre de progression en vert
-            PrgBar.Foreground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
+            viewModel.ProgressForeground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
             
             // Message de succès en VERT
-            StatusText.Text = $"✓ Votre PC est tout propre ! {moLiberes} Mo ont été libérés";
-            StatusText.Foreground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
+            viewModel.StatusText = $"✓ Votre PC est tout propre ! {moLiberes} Mo ont été libérés";
+            viewModel.StatusForeground = new SolidColorBrush(Color.FromRgb(76, 175, 80)); // Vert
             
             // Animer le message de succès avec un rebond
             AnimerMessageSucces();
             
-            BtnText.Text = "Passer la panosse";
+            viewModel.ButtonText = "Passer la panosse";
             BtnNettoyer.IsEnabled = true;
             
             // Remettre l'icône propre après le nettoyage (Reset Manuel - Mémoire Sélective v2.0)
@@ -1286,14 +1255,7 @@ namespace Panosse
                 messageDebut: "Vidage de la corbeille...",
                 action: async () =>
                 {
-                    await Task.Run(() =>
-                    {
-                        try
-                        {
-                            SHEmptyRecycleBin(IntPtr.Zero, string.Empty, 1 | 2 | 4);
-                        }
-                        catch { }
-                    });
+                    await cleanupService.EmptyRecycleBinAsync();
                     return 0; // Pas de taille mesurable pour la corbeille
                 },
                 messageFin: "✅ Corbeille vidée"
@@ -1305,13 +1267,7 @@ namespace Panosse
                 messageDebut: "Nettoyage des fichiers temporaires...",
                 action: async () =>
                 {
-                    return await Task.Run(() =>
-                    {
-                        long size = 0;
-                        size += NettoyerDossier(Path.GetTempPath());
-                        size += NettoyerDossier(@"C:\Windows\Temp");
-                        return size;
-                    });
+                    return await Task.Run(() => cleanupService.CleanTemporaryFiles());
                 },
                 messageFin: taille =>
                 {
@@ -1327,17 +1283,7 @@ namespace Panosse
                 messageDebut: "Nettoyage du cache Chrome...",
                 action: async () =>
                 {
-                    return await Task.Run(() =>
-                    {
-                        long size = 0;
-                        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                        
-                        size += NettoyerDossier(Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Cache"));
-                        size += NettoyerDossier(Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Cache\Cache_Data"));
-                        size += NettoyerDossier(Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Code Cache"));
-                        
-                        return size;
-                    });
+                    return await Task.Run(() => cleanupService.CleanChromeCache());
                 },
                 messageFin: taille =>
                 {
@@ -1353,17 +1299,7 @@ namespace Panosse
                 messageDebut: "Nettoyage du cache Edge...",
                 action: async () =>
                 {
-                    return await Task.Run(() =>
-                    {
-                        long size = 0;
-                        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                        
-                        size += NettoyerDossier(Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Cache"));
-                        size += NettoyerDossier(Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Cache\Cache_Data"));
-                        size += NettoyerDossier(Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Code Cache"));
-                        
-                        return size;
-                    });
+                    return await Task.Run(() => cleanupService.CleanEdgeCache());
                 },
                 messageFin: taille =>
                 {
@@ -1379,7 +1315,7 @@ namespace Panosse
                 messageDebut: "Nettoyage du registre...",
                 action: async () =>
                 {
-                    await Task.Run(() => NettoyerRegistre());
+                    await Task.Run(() => cleanupService.CleanRegistry());
                     return 0;
                 },
                 messageFin: "✅ Registre nettoyé"
@@ -1391,7 +1327,7 @@ namespace Panosse
                 messageDebut: "Nettoyage des téléchargements anciens...",
                 action: async () =>
                 {
-                    return await Task.Run(() => NettoyerTelechargements());
+                    return await Task.Run(() => cleanupService.CleanOldDownloads());
                 },
                 messageFin: taille =>
                 {
@@ -1407,7 +1343,7 @@ namespace Panosse
                 messageDebut: "Nettoyage des logs Windows...",
                 action: async () =>
                 {
-                    return await Task.Run(() => NettoyerLogsWindows());
+                    return await Task.Run(() => cleanupService.CleanWindowsLogs());
                 },
                 messageFin: taille =>
                 {
@@ -1423,7 +1359,7 @@ namespace Panosse
                 messageDebut: "Nettoyage du cache des miniatures...",
                 action: async () =>
                 {
-                    return await Task.Run(() => NettoyerCacheMiniatures());
+                    return await Task.Run(() => cleanupService.CleanThumbnailCache());
                 },
                 messageFin: taille =>
                 {
@@ -1475,30 +1411,30 @@ namespace Panosse
         // Méthodes utilitaires pour l'interface utilisateur
         private async Task AjouterMessageTache(string message)
         {
-            await Dispatcher.InvokeAsync(() => taskMessages.Add(message));
+            await Dispatcher.InvokeAsync(() => viewModel.TaskMessages.Add(message));
         }
 
         private async Task MettreAJourDernierMessage(string message)
         {
             await Dispatcher.InvokeAsync(() =>
             {
-                if (taskMessages.Count > 0)
+                if (viewModel.TaskMessages.Count > 0)
                 {
-                    taskMessages[taskMessages.Count - 1] = message;
+                    viewModel.TaskMessages[viewModel.TaskMessages.Count - 1] = message;
                 }
             });
         }
 
         private async Task MettreAJourStatut(string message)
         {
-            await Dispatcher.InvokeAsync(() => StatusText.Text = message);
+            await Dispatcher.InvokeAsync(() => viewModel.StatusText = message);
         }
 
         private async Task MettreAJourProgression()
         {
             await Dispatcher.InvokeAsync(() =>
             {
-                PrgBar.Value = (etapesCourantes * 100.0) / etapesTotales;
+                viewModel.ProgressValue = (etapesCourantes * 100.0) / etapesTotales;
             });
         }
 
@@ -1624,324 +1560,6 @@ namespace Panosse
             return 0;
         }
 
-        private void NettoyerRegistre()
-        {
-            // Nettoyer l'historique des commandes exécutées (RunMRU)
-            try
-            {
-                using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU", true))
-                {
-                    if (key != null)
-                    {
-                        // Récupérer tous les noms de valeurs
-                        string[] valueNames = key.GetValueNames();
-                        
-                        // Supprimer toutes les valeurs sauf la valeur par défaut
-                        foreach (string valueName in valueNames)
-                        {
-                            if (!string.IsNullOrEmpty(valueName))
-                            {
-                                try
-                                {
-                                    key.DeleteValue(valueName, false);
-                                }
-                                catch { /* Ignore les erreurs individuelles */ }
-                            }
-                        }
-                    }
-                }
-            }
-            catch { /* Ignore les erreurs d'accès au registre */ }
-
-            // Nettoyer la liste des documents récents
-            try
-            {
-                using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\RecentDocs", true))
-                {
-                    if (key != null)
-                    {
-                        // Récupérer tous les noms de valeurs
-                        string[] valueNames = key.GetValueNames();
-                        
-                        // Supprimer toutes les valeurs sauf la valeur par défaut
-                        foreach (string valueName in valueNames)
-                        {
-                            if (!string.IsNullOrEmpty(valueName))
-                            {
-                                try
-                                {
-                                    key.DeleteValue(valueName, false);
-                                }
-                                catch { /* Ignore les erreurs individuelles */ }
-                            }
-                        }
-
-                        // Nettoyer également les sous-clés (documents récents par type de fichier)
-                        string[] subKeyNames = key.GetSubKeyNames();
-                        foreach (string subKeyName in subKeyNames)
-                        {
-                            try
-                            {
-                                using (RegistryKey? subKey = key.OpenSubKey(subKeyName, true))
-                                {
-                                    if (subKey != null)
-                                    {
-                                        string[] subValueNames = subKey.GetValueNames();
-                                        foreach (string valueName in subValueNames)
-                                        {
-                                            if (!string.IsNullOrEmpty(valueName))
-                                            {
-                                                try
-                                                {
-                                                    subKey.DeleteValue(valueName, false);
-                                                }
-                                                catch { /* Ignore les erreurs individuelles */ }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            catch { /* Ignore les erreurs de sous-clés */ }
-                        }
-                    }
-                }
-            }
-            catch { /* Ignore les erreurs d'accès au registre */ }
-        }
-
-        private long NettoyerTelechargements()
-        {
-            long tailleSupprimee = 0;
-            
-            try
-            {
-                // Obtenir le chemin du dossier Downloads
-                string downloadsPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    "Downloads"
-                );
-
-                if (!Directory.Exists(downloadsPath))
-                {
-                    return 0;
-                }
-
-                DirectoryInfo downloadsDir = new DirectoryInfo(downloadsPath);
-                DateTime dateSeuilSuppression = DateTime.Now.AddDays(-14);
-
-                // Parcourir les fichiers .exe et .msi
-                var fichiersASupprimer = downloadsDir.GetFiles()
-                    .Where(f => 
-                        (f.Extension.Equals(".exe", StringComparison.OrdinalIgnoreCase) ||
-                         f.Extension.Equals(".msi", StringComparison.OrdinalIgnoreCase)) &&
-                        f.LastWriteTime < dateSeuilSuppression
-                    );
-
-                foreach (FileInfo fichier in fichiersASupprimer)
-                {
-                    try
-                    {
-                        tailleSupprimee += fichier.Length;
-                        fichier.Delete();
-                    }
-                    catch
-                    {
-                        // Fichier en cours d'utilisation ou protégé, on ignore
-                    }
-                }
-            }
-            catch
-            {
-                // Erreur d'accès au dossier Downloads, on ignore
-            }
-
-            return tailleSupprimee;
-        }
-
-        private long NettoyerLogsWindows()
-        {
-            long tailleSupprimee = 0;
-            
-            try
-            {
-                string logsPath = @"C:\Windows\Logs";
-                
-                if (!Directory.Exists(logsPath))
-                {
-                    return 0;
-                }
-
-                DirectoryInfo logsDir = new DirectoryInfo(logsPath);
-                
-                // Nettoyer les fichiers de logs dans le dossier principal
-                foreach (FileInfo file in logsDir.GetFiles("*.log", SearchOption.AllDirectories))
-                {
-                    try
-                    {
-                        // Vérifier que le fichier n'est pas trop récent (garder logs des 7 derniers jours)
-                        if (file.LastWriteTime < DateTime.Now.AddDays(-7))
-                        {
-                            tailleSupprimee += file.Length;
-                            file.Delete();
-                        }
-                    }
-                    catch
-                    {
-                        // Fichier verrouillé par le système ou en cours d'utilisation, on ignore
-                    }
-                }
-
-                // Nettoyer aussi les fichiers .etl (Event Trace Logs) et .old
-                foreach (FileInfo file in logsDir.GetFiles("*.etl", SearchOption.AllDirectories))
-                {
-                    try
-                    {
-                        if (file.LastWriteTime < DateTime.Now.AddDays(-7))
-                        {
-                            tailleSupprimee += file.Length;
-                            file.Delete();
-                        }
-                    }
-                    catch { /* Fichier système verrouillé */ }
-                }
-
-                foreach (FileInfo file in logsDir.GetFiles("*.old", SearchOption.AllDirectories))
-                {
-                    try
-                    {
-                        tailleSupprimee += file.Length;
-                        file.Delete();
-                    }
-                    catch { /* Fichier système verrouillé */ }
-                }
-            }
-            catch
-            {
-                // Erreur d'accès au dossier Logs (permissions insuffisantes), on ignore
-            }
-
-            return tailleSupprimee;
-        }
-
-        private long NettoyerCacheMiniatures()
-        {
-            long tailleSupprimee = 0;
-            
-            try
-            {
-                // Chemin du cache des miniatures
-                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                string thumbnailsPath = Path.Combine(localAppData, @"Microsoft\Windows\Explorer");
-                
-                if (!Directory.Exists(thumbnailsPath))
-                {
-                    return 0;
-                }
-
-                DirectoryInfo thumbnailsDir = new DirectoryInfo(thumbnailsPath);
-                
-                // Nettoyer tous les fichiers thumbcache*.db
-                foreach (FileInfo file in thumbnailsDir.GetFiles("thumbcache*.db"))
-                {
-                    try
-                    {
-                        tailleSupprimee += file.Length;
-                        file.Delete();
-                    }
-                    catch
-                    {
-                        // Fichier en cours d'utilisation par l'explorateur, on ignore
-                    }
-                }
-
-                // Nettoyer aussi les fichiers iconcache*.db
-                foreach (FileInfo file in thumbnailsDir.GetFiles("iconcache*.db"))
-                {
-                    try
-                    {
-                        tailleSupprimee += file.Length;
-                        file.Delete();
-                    }
-                    catch
-                    {
-                        // Fichier en cours d'utilisation, on ignore
-                    }
-                }
-            }
-            catch
-            {
-                // Erreur d'accès au dossier, on ignore
-            }
-
-            return tailleSupprimee;
-        }
-
-        private long NettoyerDossier(string chemin)
-        {
-            long tailleSupprimee = 0;
-            if (!Directory.Exists(chemin)) return 0;
-
-            try
-            {
-                DirectoryInfo di = new DirectoryInfo(chemin);
-                
-                // Nettoyer les fichiers
-                foreach (FileInfo file in di.GetFiles())
-                {
-                    try 
-                    { 
-                        tailleSupprimee += file.Length;
-                        file.Delete(); 
-                    } 
-                    catch { /* Fichier utilisé, on ignore */ }
-                }
-
-                // Nettoyer les sous-dossiers récursivement
-                foreach (DirectoryInfo subDir in di.GetDirectories())
-                {
-                    try
-                    {
-                        tailleSupprimee += NettoyerDossierRecursif(subDir);
-                    }
-                    catch { /* Dossier protégé, on ignore */ }
-                }
-            }
-            catch { }
-
-            return tailleSupprimee;
-        }
-
-        private long NettoyerDossierRecursif(DirectoryInfo dir)
-        {
-            long taille = 0;
-            
-            try
-            {
-                foreach (FileInfo file in dir.GetFiles())
-                {
-                    try
-                    {
-                        taille += file.Length;
-                        file.Delete();
-                    }
-                    catch { }
-                }
-
-                foreach (DirectoryInfo subDir in dir.GetDirectories())
-                {
-                    try
-                    {
-                        taille += NettoyerDossierRecursif(subDir);
-                        subDir.Delete();
-                    }
-                    catch { }
-                }
-            }
-            catch { }
-
-            return taille;
-        }
-
         // ==========================================
         // VÉRIFICATION DES MISES À JOUR
         // ==========================================
@@ -1956,94 +1574,36 @@ namespace Panosse
             
             try
             {
-                using (var client = new HttpClient())
+                UpdateCheckResult result = await updateService.CheckForUpdateAsync(GITHUB_REPO, VERSION_ACTUELLE);
+                if (result.VerificationFailed)
                 {
-                    // Timeout de 10 secondes pour éviter de bloquer trop longtemps
-                    client.Timeout = TimeSpan.FromSeconds(10);
-                    
-                    // Ajouter un User-Agent (requis par l'API GitHub)
-                    client.DefaultRequestHeaders.UserAgent.ParseAdd("Panosse-App/1.0");
-                    
-                    // URL de l'API GitHub pour la dernière release
-                    string apiUrl = $"https://api.github.com/repos/{GITHUB_REPO}/releases/latest";
-                    
-                    // Récupérer les informations de la dernière release
-                    var response = await client.GetStringAsync(apiUrl);
-                    
-                    // Parser la réponse JSON
-                    using (JsonDocument doc = JsonDocument.Parse(response))
-                    {
-                        var root = doc.RootElement;
-                        
-                        // Récupérer le tag_name (ex: "v1.0.1")
-                        string tagName = root.GetProperty("tag_name").GetString() ?? "";
-                        
-                        // Récupérer l'URL de la release
-                        string htmlUrl = root.GetProperty("html_url").GetString() ?? "";
-                        
-                        // Récupérer l'URL de téléchargement du .exe
-                        string exeDownloadUrl = "";
-                        if (root.TryGetProperty("assets", out JsonElement assets) && assets.GetArrayLength() > 0)
-                        {
-                            foreach (JsonElement asset in assets.EnumerateArray())
-                            {
-                                string assetName = asset.GetProperty("name").GetString() ?? "";
-                                // Chercher le fichier .exe (ex: Panosse-v1.0.1.exe)
-                                if (assetName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    exeDownloadUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        // Enlever le 'v' du début si présent
-                        string versionDistante = tagName.TrimStart('v');
-                        
-                        // Comparer les versions
-                        if (EstVersionPlusRecente(versionDistante, VERSION_ACTUELLE))
-                        {
-                            // Sauvegarder les URLs pour le bouton "Mettre à jour"
-                            derniereVersionUrl = htmlUrl;
-                            derniereVersionTag = tagName;
-                            downloadUrl = exeDownloadUrl;
-                            estAJour = false;
-                            verificationEchouee = false;
-                            
-                            // Afficher la barre de notification
-                            await Dispatcher.InvokeAsync(() =>
-                            {
-                                UpdateMessage.Text = $"Une nouvelle version ({tagName}) est disponible !";
-                                AfficherBarreMiseAJour();
-                            });
-                        }
-                        else
-                        {
-                            // L'application est à jour
-                            estAJour = true;
-                            verificationEchouee = false;
-                        }
-                    }
+                    GererErreurVerification();
+                    return;
                 }
-            }
-            catch (HttpRequestException)
-            {
-                // Erreur réseau (pas de connexion Internet, DNS échoue, etc.)
-                GererErreurVerification();
-            }
-            catch (TaskCanceledException)
-            {
-                // Timeout de la requête (connexion trop lente)
-                GererErreurVerification();
-            }
-            catch (JsonException)
-            {
-                // Erreur de parsing JSON (réponse invalide de GitHub)
-                GererErreurVerification();
+
+                if (result.HasUpdate && result.ReleaseInfo != null)
+                {
+                    // Sauvegarder les URLs pour le bouton "Mettre à jour"
+                    derniereVersionUrl = result.ReleaseInfo.HtmlUrl;
+                    derniereVersionTag = result.ReleaseInfo.TagName;
+                    downloadUrl = result.ReleaseInfo.DownloadUrl;
+                    estAJour = false;
+                    verificationEchouee = false;
+
+                    // Afficher la barre de notification
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        viewModel.UpdateMessage = $"Une nouvelle version ({result.ReleaseInfo.TagName}) est disponible !";
+                        AfficherBarreMiseAJour();
+                    });
+                    return;
+                }
+
+                estAJour = result.IsUpToDate;
+                verificationEchouee = false;
             }
             catch (Exception)
             {
-                // Toute autre erreur imprévue
                 GererErreurVerification();
             }
         }
@@ -2060,45 +1620,6 @@ namespace Panosse
             // Ne pas afficher de MessageBox ou de fenêtre d'erreur
             // L'utilisateur peut continuer à utiliser l'application normalement
             // Le bouton dans "À propos" affichera un message approprié
-        }
-
-        /// <summary>
-        /// Compare deux versions au format X.Y.Z
-        /// </summary>
-        private bool EstVersionPlusRecente(string versionDistante, string versionLocale)
-        {
-            try
-            {
-                // Enlever les suffixes comme "-beta", "-alpha" pour la comparaison
-                versionDistante = versionDistante.Split('-')[0];
-                versionLocale = versionLocale.Split('-')[0];
-                
-                var partsDistante = versionDistante.Split('.').Select(int.Parse).ToArray();
-                var partsLocale = versionLocale.Split('.').Select(int.Parse).ToArray();
-                
-                // Comparer MAJOR
-                if (partsDistante[0] > partsLocale[0]) return true;
-                if (partsDistante[0] < partsLocale[0]) return false;
-                
-                // Comparer MINOR
-                if (partsDistante.Length > 1 && partsLocale.Length > 1)
-                {
-                    if (partsDistante[1] > partsLocale[1]) return true;
-                    if (partsDistante[1] < partsLocale[1]) return false;
-                }
-                
-                // Comparer PATCH
-                if (partsDistante.Length > 2 && partsLocale.Length > 2)
-                {
-                    if (partsDistante[2] > partsLocale[2]) return true;
-                }
-                
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
         }
 
         /// <summary>
@@ -2185,9 +1706,9 @@ namespace Panosse
                 BtnFermerUpdate.IsEnabled = false;
                 
                 // Changer le message et afficher la barre de progression
-                UpdateMessage.Text = "Téléchargement de la mise à jour...";
-                DownloadProgressBar.Visibility = Visibility.Visible;
-                DownloadProgressBar.Value = 0;
+                viewModel.UpdateMessage = "Téléchargement de la mise à jour...";
+                viewModel.DownloadProgressVisibility = Visibility.Visible;
+                viewModel.DownloadProgressValue = 0;
 
                 // Télécharger la nouvelle version avec progression
                 await TelechargerEtInstallerMiseAJour();
@@ -2195,7 +1716,7 @@ namespace Panosse
             catch (Exception ex)
             {
                 // Masquer la barre de progression
-                DownloadProgressBar.Visibility = Visibility.Collapsed;
+                viewModel.DownloadProgressVisibility = Visibility.Collapsed;
                 
                 // En cas d'erreur, afficher un message et proposer le téléchargement manuel
                 var result = MessageBox.Show(
@@ -2223,7 +1744,7 @@ namespace Panosse
                 // Réactiver les boutons
                 BtnMettreAJour.IsEnabled = true;
                 BtnFermerUpdate.IsEnabled = true;
-                UpdateMessage.Text = $"Une nouvelle version ({derniereVersionTag}) est disponible !";
+                viewModel.UpdateMessage = $"Une nouvelle version ({derniereVersionTag}) est disponible !";
             }
         }
 
@@ -2282,8 +1803,8 @@ namespace Panosse
                             // Mettre à jour la barre de progression sur le thread UI
                             await Dispatcher.InvokeAsync(() =>
                             {
-                                DownloadProgressBar.Value = progressPercentage;
-                                UpdateMessage.Text = $"Téléchargement de la mise à jour... {progressPercentage}%";
+                                viewModel.DownloadProgressValue = progressPercentage;
+                                viewModel.UpdateMessage = $"Téléchargement de la mise à jour... {progressPercentage}%";
                             });
                         }
                     }
@@ -2293,8 +1814,8 @@ namespace Panosse
             // Masquer la barre de progression et changer le message
             await Dispatcher.InvokeAsync(() =>
             {
-                DownloadProgressBar.Visibility = Visibility.Collapsed;
-                UpdateMessage.Text = "Installation en cours...";
+                viewModel.DownloadProgressVisibility = Visibility.Collapsed;
+                viewModel.UpdateMessage = "Installation en cours...";
             });
 
             // Créer le script batch de mise à jour
