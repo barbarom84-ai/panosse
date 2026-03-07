@@ -495,7 +495,7 @@
                                HorizontalAlignment="Center"
                                Margin="0,0,0,5"/>
                     
-                    <TextBlock Text="Marco"
+                    <TextBlock Text="Marco Barbaro"
                                FontSize="16"
                                FontWeight="SemiBold"
                                Foreground="#424242"
