@@ -3,8 +3,8 @@
 ; Créé le 01/01/2025
 
 #define MyAppName "Panosse"
-#define MyAppVersion "2.0.0"
-#define MyAppPublisher "Panosse"
+#define MyAppVersion "2.1.0"
+#define MyAppPublisher "Marco Barbaro"
 #define MyAppURL "https://github.com/barbarom84-ai/panosse"
 #define MyAppExeName "Panosse.exe"
 #define MyAppIconFile "assets\panosse.ico"
@@ -73,10 +73,11 @@ Name: "startupicon"; Description: "{cm:AutoStartProgram,{#MyAppName}}"; GroupDes
 
 [Files]
 ; Fichier principal et toutes les DLLs natives (depuis le dossier publish)
-Source: "bin\Release\net8.0-windows\win-x64\publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "bin\Release\net8.0-windows\win-x64\publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion
+; Aligne avec _Scripts/creer-installateur.ps1 qui publie dans .\publish
+Source: "publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
-; Fichiers icônes pour le System Tray (v2.0.0 - mémoire sélective)
+; Fichiers icônes pour le System Tray (v2.1.0)
 ; Copiés depuis le dossier assets source (pas depuis publish car embarqués)
 Source: "{#MyAppIconClean}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyAppIconDirty}"; DestDir: "{app}"; Flags: ignoreversion
@@ -143,11 +144,12 @@ begin
   if CurStep = ssPostInstall then
   begin
     // Afficher un message informatif après l'installation
-    MsgBox('Panosse v2.0.0 a été installé avec succès !' + #13#10 + #13#10 + 
-           'NOUVEAUTÉS v2.0.0 :' + #13#10 +
+    MsgBox('Panosse v2.1.0 a été installé avec succès !' + #13#10 + #13#10 + 
+           'NOUVEAUTÉS v2.1.0 :' + #13#10 +
            '  - Raccourci global Ctrl+Alt+P pour nettoyer en arrière-plan' + #13#10 +
            '  - Icône System Tray avec changement d''état (propre/sale)' + #13#10 +
-           '  - Surveillance intelligente du dossier Téléchargements' + #13#10 + #13#10 +
+           '  - Surveillance intelligente du dossier Téléchargements' + #13#10 +
+           '  - Nouveau panneau Paramètres (notifications/son/mise à jour auto)' + #13#10 + #13#10 +
            'TIP : Si vous avez coché "Lancer au démarrage", le raccourci' + #13#10 +
            'Ctrl+Alt+P sera toujours disponible en arrière-plan !', 
            mbInformation, MB_OK);
@@ -165,11 +167,11 @@ english.AutoStartProgram=Start %1 with Windows (recommended for Ctrl+Alt+P hotke
 [Messages]
 ; Messages personnalisés en français
 french.WelcomeLabel1=Bienvenue dans l'assistant d'installation de [name]
-french.WelcomeLabel2=Ceci installera [name/ver] sur votre ordinateur.%n%nPanosse est une application de nettoyage automatique qui vous aide à garder votre PC propre et rapide.%n%nNOUVEAUTÉS v2.0.0 :%n  - Raccourci global Ctrl+Alt+P%n  - Icône System Tray intelligente%n  - Surveillance automatique des Téléchargements%n%nIl est recommandé de fermer toutes les autres applications avant de continuer.
+french.WelcomeLabel2=Ceci installera [name/ver] sur votre ordinateur.%n%nPanosse est une application de nettoyage automatique qui vous aide à garder votre PC propre et rapide.%n%nNOUVEAUTÉS v2.1.0 :%n  - Raccourci global Ctrl+Alt+P%n  - Icône System Tray intelligente%n  - Surveillance automatique des Téléchargements%n  - Nouveau panneau Paramètres%n%nIl est recommandé de fermer toutes les autres applications avant de continuer.
 french.FinishedHeadingLabel=Installation de [name] terminée
 french.FinishedLabelNoIcons=L'installation de [name] est terminée.
 french.FinishedLabel=L'installation de [name] est terminée. L'application peut être lancée en cliquant sur les icônes installées.
 french.ClickFinish=Cliquez sur Terminer pour quitter l'assistant d'installation.
 
-english.WelcomeLabel2=This will install [name/ver] on your computer.%n%nPanosse is an automatic cleaning application that helps keep your PC clean and fast.%n%nNEW in v2.0.0:%n  - Global hotkey Ctrl+Alt+P%n  - Smart System Tray icon%n  - Automatic Downloads monitoring%n%nIt is recommended that you close all other applications before continuing.
+english.WelcomeLabel2=This will install [name/ver] on your computer.%n%nPanosse is an automatic cleaning application that helps keep your PC clean and fast.%n%nNEW in v2.1.0:%n  - Global hotkey Ctrl+Alt+P%n  - Smart System Tray icon%n  - Automatic Downloads monitoring%n  - New Settings panel%n%nIt is recommended that you close all other applications before continuing.
 
