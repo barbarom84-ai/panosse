@@ -24,6 +24,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private Brush checkUpdatesButtonBackground = new SolidColorBrush(Color.FromRgb(76, 175, 80));
     private bool isCheckUpdatesButtonEnabled = true;
     private string lastUpdateCheckText = "Dernière vérification : jamais";
+    private bool checkUpdatesOnStartup = true;
+    private bool playSuccessSound = true;
+    private bool showTrayNotifications = true;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -39,6 +42,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ICommand? CheckUpdatesCommand { get; set; }
     public ICommand? InstallUpdateCommand { get; set; }
     public ICommand? CloseUpdateBarCommand { get; set; }
+    public ICommand? OpenSettingsCommand { get; set; }
+    public ICommand? CloseSettingsCommand { get; set; }
+    public ICommand? SaveSettingsCommand { get; set; }
 
     public string ButtonText
     {
@@ -128,6 +134,24 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         get => lastUpdateCheckText;
         set => SetField(ref lastUpdateCheckText, value);
+    }
+
+    public bool CheckUpdatesOnStartup
+    {
+        get => checkUpdatesOnStartup;
+        set => SetField(ref checkUpdatesOnStartup, value);
+    }
+
+    public bool PlaySuccessSound
+    {
+        get => playSuccessSound;
+        set => SetField(ref playSuccessSound, value);
+    }
+
+    public bool ShowTrayNotifications
+    {
+        get => showTrayNotifications;
+        set => SetField(ref showTrayNotifications, value);
     }
 
     private void SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

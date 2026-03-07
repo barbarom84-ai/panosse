@@ -124,6 +124,16 @@ L'installateur `Panosse-Setup-v1.0.0.exe` sera dans `.\installer\`
 
 Consultez `INNO-SETUP-GUIDE.md` pour plus de détails.
 
+### Checklist de release mensuelle
+
+Consultez `docs/release/monthly-release-checklist.md` avant chaque publication.
+
+### Roadmap 2026 (documents d'exécution)
+
+- Spécifications Q1 : `docs/roadmap/2026/q1-feature-specs.md`
+- Cibles d'extraction architecture : `docs/roadmap/2026/architecture-extraction-targets.md`
+- Compteurs telemetry locaux : `docs/roadmap/2026/telemetry-counters.md`
+
 ## 📋 Utilisation
 
 1. **Lancez l'application** → La fenêtre UAC demande les droits admin

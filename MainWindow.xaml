@@ -130,6 +130,8 @@
             
             <!-- Menu Outils -->
             <MenuItem Header="🔧 _Outils" FontSize="12" Padding="10,5">
+                <MenuItem Header="⚙️ _Paramètres" Command="{Binding OpenSettingsCommand}" />
+                <Separator />
                 <MenuItem Header="🔍 _Vérifier les mises à jour" Command="{Binding CheckUpdatesCommand}" />
                 <Separator />
                 <MenuItem Header="🌐 _Ouvrir le dépôt GitHub" Command="{Binding OpenGitHubCommand}" />
@@ -554,6 +556,81 @@
                     </Button>
                 </StackPanel>
                 </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- Overlay Paramètres -->
+        <Grid x:Name="OverlaySettings"
+              Background="#CC000000"
+              Visibility="Collapsed"
+              MouseLeftButtonDown="OverlaySettings_MouseDown">
+
+            <Border Background="White"
+                    CornerRadius="15"
+                    Width="340"
+                    MaxHeight="420"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Padding="24,22,24,20">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.3"/>
+                </Border.Effect>
+
+                <StackPanel>
+                    <TextBlock Text="⚙️ Paramètres"
+                               FontSize="24"
+                               FontWeight="Bold"
+                               Foreground="#2196F3"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,18"/>
+
+                    <Border Height="1" Background="#E0E0E0" Margin="0,0,0,16"/>
+
+                    <CheckBox Content="Vérifier les mises à jour au démarrage"
+                              IsChecked="{Binding CheckUpdatesOnStartup}"
+                              FontSize="13"
+                              Foreground="#424242"
+                              Margin="0,0,0,12"/>
+
+                    <CheckBox Content="Jouer le son de réussite"
+                              IsChecked="{Binding PlaySuccessSound}"
+                              FontSize="13"
+                              Foreground="#424242"
+                              Margin="0,0,0,12"/>
+
+                    <CheckBox Content="Afficher les notifications dans la barre des tâches"
+                              IsChecked="{Binding ShowTrayNotifications}"
+                              FontSize="13"
+                              Foreground="#424242"
+                              Margin="0,0,0,18"/>
+
+                    <TextBlock Text="Ces préférences sont sauvegardées automatiquement."
+                               FontSize="11"
+                               Foreground="#9E9E9E"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,18"/>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Annuler"
+                                Command="{Binding CloseSettingsCommand}"
+                                Background="#EEEEEE"
+                                Foreground="#616161"
+                                BorderThickness="0"
+                                Padding="18,8"
+                                FontSize="13"
+                                Margin="0,0,10,0"
+                                Cursor="Hand"/>
+
+                        <Button Content="Enregistrer"
+                                Command="{Binding SaveSettingsCommand}"
+                                Background="#2196F3"
+                                Foreground="White"
+                                BorderThickness="0"
+                                Padding="18,8"
+                                FontSize="13"
+                                Cursor="Hand"/>
+                    </StackPanel>
+                </StackPanel>
             </Border>
         </Grid>
     </Grid>

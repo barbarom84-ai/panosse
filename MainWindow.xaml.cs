@@ -105,6 +105,8 @@ namespace Panosse
         private const int SEUIL_JOURS_ANCIEN = 30;
         private readonly ICleanupService cleanupService;
         private readonly IUpdateService updateService;
+        private readonly ISettingsService settingsService;
+        private readonly ITelemetryService telemetryService;
 
         public MainWindow()
         {
@@ -118,7 +120,11 @@ namespace Panosse
                 DataContext = viewModel;
                 cleanupService = new CleanupService();
                 updateService = new UpdateService();
+                settingsService = new SettingsService();
+                telemetryService = new TelemetryService();
+                ChargerParametres();
                 ConfigurerCommandes();
+                telemetryService.Increment("app_launch_count");
                 
                 Loaded += MainWindow_Loaded;
                 LogDebug("Constructeur - Loaded event ajouté");
@@ -148,6 +154,43 @@ namespace Panosse
             viewModel.CheckUpdatesCommand = new AsyncRelayCommand(ExecuteCheckUpdatesAsync);
             viewModel.InstallUpdateCommand = new AsyncRelayCommand(ExecuteInstallUpdateAsync);
             viewModel.CloseUpdateBarCommand = new RelayCommand(() => BtnFermerUpdate_Click(this, new RoutedEventArgs()));
+            viewModel.OpenSettingsCommand = new RelayCommand(() => OuvrirParametres());
+            viewModel.CloseSettingsCommand = new RelayCommand(() => FermerParametres());
+            viewModel.SaveSettingsCommand = new RelayCommand(() => SauvegarderParametres());
+        }
+
+        private void ChargerParametres()
+        {
+            AppSettings settings = settingsService.Load();
+            viewModel.CheckUpdatesOnStartup = settings.CheckUpdatesOnStartup;
+            viewModel.PlaySuccessSound = settings.PlaySuccessSound;
+            viewModel.ShowTrayNotifications = settings.ShowTrayNotifications;
+        }
+
+        private void SauvegarderParametres()
+        {
+            settingsService.Save(new AppSettings
+            {
+                CheckUpdatesOnStartup = viewModel.CheckUpdatesOnStartup,
+                PlaySuccessSound = viewModel.PlaySuccessSound,
+                ShowTrayNotifications = viewModel.ShowTrayNotifications
+            });
+            telemetryService.Increment("settings_save_count");
+
+            FermerParametres();
+            viewModel.StatusText = "⚙️ Paramètres sauvegardés";
+            viewModel.StatusForeground = new SolidColorBrush(Color.FromRgb(76, 175, 80));
+        }
+
+        private void OuvrirParametres()
+        {
+            telemetryService.Increment("settings_open_count");
+            OverlaySettings.Visibility = Visibility.Visible;
+        }
+
+        private void FermerParametres()
+        {
+            OverlaySettings.Visibility = Visibility.Collapsed;
         }
 
         /// <summary>
@@ -350,6 +393,12 @@ namespace Panosse
             
             // Arrêter la surveillance
             ArreterSurveillanceTelechi();
+            settingsService.Save(new AppSettings
+            {
+                CheckUpdatesOnStartup = viewModel.CheckUpdatesOnStartup,
+                PlaySuccessSound = viewModel.PlaySuccessSound,
+                ShowTrayNotifications = viewModel.ShowTrayNotifications
+            });
             
             // Nettoyer l'icône du System Tray
             if (notifyIcon != null)
@@ -375,7 +424,7 @@ namespace Panosse
             this.Hide();
             
             // Afficher une notification (optionnel)
-            if (notifyIcon != null)
+            if (notifyIcon != null && viewModel.ShowTrayNotifications)
             {
                 notifyIcon.ShowBalloonTip(
                     2000,
@@ -765,6 +814,7 @@ namespace Panosse
         /// </summary>
         private async void LancerNettoyageArrierePlan()
         {
+            telemetryService.Increment("cleanup_background_start_count");
             await Task.Run(async () =>
             {
                 try
@@ -783,10 +833,12 @@ namespace Panosse
                     
                     // Afficher la notification Toast
                     await Dispatcher.InvokeAsync(() => AfficherNotificationToast());
+                    telemetryService.Increment("cleanup_background_success_count");
                 }
                 catch (Exception ex)
                 {
                     LogDebug($"❌ Erreur pendant le nettoyage en arrière-plan: {ex.Message}");
+                    telemetryService.Increment("cleanup_background_failed_count");
                 }
             });
         }
@@ -842,6 +894,11 @@ namespace Panosse
         /// </summary>
         private void JouerSonReussite()
         {
+            if (!viewModel.PlaySuccessSound)
+            {
+                return;
+            }
+
             try
             {
                 // Jouer le son "Asterisk" de Windows (son de succès)
@@ -858,6 +915,11 @@ namespace Panosse
         /// </summary>
         private void AfficherNotificationToast()
         {
+            if (!viewModel.ShowTrayNotifications)
+            {
+                return;
+            }
+
             try
             {
                 if (notifyIcon != null)
@@ -873,6 +935,7 @@ namespace Panosse
                         message,
                         Forms.ToolTipIcon.Info
                     );
+                    telemetryService.Increment("tray_notification_shown_count");
                 }
             }
             catch (Exception ex)
@@ -912,8 +975,15 @@ namespace Panosse
             }
             
             // Vérifier les mises à jour en arrière-plan
-            LogDebug("MainWindow_Loaded - Vérification mises à jour...");
-            _ = VerifierMiseAJour();
+            if (viewModel.CheckUpdatesOnStartup)
+            {
+                LogDebug("MainWindow_Loaded - Vérification mises à jour...");
+                _ = VerifierMiseAJour();
+            }
+            else
+            {
+                LogDebug("MainWindow_Loaded - Vérification mises à jour désactivée");
+            }
             
             LogDebug("MainWindow_Loaded - Fin (succès)");
         }
@@ -1094,7 +1164,7 @@ namespace Panosse
             this.Hide();
             
             // Afficher une notification
-            if (notifyIcon != null)
+            if (notifyIcon != null && viewModel.ShowTrayNotifications)
             {
                 notifyIcon.ShowBalloonTip(
                     2000,
@@ -1107,6 +1177,7 @@ namespace Panosse
 
         private void BtnAPropos_Click(object sender, RoutedEventArgs e)
         {
+            telemetryService.Increment("about_open_count");
             // Afficher l'overlay "À propos" avec animation
             OverlayAPropos.Visibility = Visibility.Visible;
             AnimerApparitionOverlay();
@@ -1191,6 +1262,14 @@ namespace Panosse
             }
         }
 
+        private void OverlaySettings_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.Source == OverlaySettings)
+            {
+                FermerParametres();
+            }
+        }
+
         private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
         {
             // Ouvrir le lien dans le navigateur par défaut
@@ -1216,6 +1295,7 @@ namespace Panosse
 
         private async Task ExecuteCleaningAsync()
         {
+            telemetryService.Increment("cleanup_manual_start_count");
             // Désactiver le bouton pendant le nettoyage
             BtnNettoyer.IsEnabled = false;
             viewModel.ButtonText = "Nettoyage en cours...";
@@ -1241,6 +1321,8 @@ namespace Panosse
 
             // Exécuter le nettoyage avec suivi des étapes
             long octetsLiberes = await ExecuterNettoyageAvecProgression();
+            telemetryService.Increment("cleanup_manual_success_count");
+            telemetryService.AddToCounter("cleanup_manual_freed_mb_total", octetsLiberes / (1024 * 1024));
 
             // Arrêter l'animation
             StopPulseAnimation();
@@ -1597,6 +1679,7 @@ namespace Panosse
                 if (result.VerificationFailed)
                 {
                     GererErreurVerification();
+                    telemetryService.Increment("update_check_failed_count");
                     return;
                 }
 
@@ -1615,15 +1698,21 @@ namespace Panosse
                         viewModel.UpdateMessage = $"Une nouvelle version ({result.ReleaseInfo.TagName}) est disponible !";
                         AfficherBarreMiseAJour();
                     });
+                    telemetryService.Increment("update_check_update_available_count");
                     return;
                 }
 
                 estAJour = result.IsUpToDate;
                 verificationEchouee = false;
+                if (estAJour)
+                {
+                    telemetryService.Increment("update_check_up_to_date_count");
+                }
             }
             catch (Exception)
             {
                 GererErreurVerification();
+                telemetryService.Increment("update_check_error_count");
             }
         }
 
@@ -1705,6 +1794,7 @@ namespace Panosse
 
         private async Task ExecuteInstallUpdateAsync()
         {
+            telemetryService.Increment("update_install_start_count");
             if (string.IsNullOrEmpty(downloadUrl))
             {
                 // Fallback : ouvrir la page GitHub si pas d'URL de téléchargement
@@ -1739,6 +1829,7 @@ namespace Panosse
             }
             catch (Exception ex)
             {
+                telemetryService.Increment("update_install_failed_count");
                 // Masquer la barre de progression
                 viewModel.DownloadProgressVisibility = Visibility.Collapsed;
                 
@@ -1914,6 +2005,7 @@ REM Supprimer le script lui-même
             Process.Start(processInfo);
 
             // Fermer l'application actuelle
+            telemetryService.Increment("update_install_success_count");
             Application.Current.Shutdown();
         }
 
@@ -1927,6 +2019,7 @@ REM Supprimer le script lui-même
 
         private async Task ExecuteCheckUpdatesAsync()
         {
+            telemetryService.Increment("update_check_start_count");
             // Désactiver le bouton pendant la vérification
             viewModel.IsCheckUpdatesButtonEnabled = false;
             viewModel.CheckUpdatesButtonText = "Vérification...";
