@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'  # Déclenche sur tous les tags commençant par 'v' (ex: v1.0.0, v1.1.0, etc.)
+  workflow_dispatch:
 
 permissions:
   contents: write  # Nécessaire pour créer des releases
@@ -58,10 +59,9 @@ jobs:
         # Créer un fichier de checksums
         echo "$hash  Panosse-$version.exe" > publish\SHA256SUMS.txt
         
-    # 7. Créer la GitHub Release avec gh CLI
-    - name: Create GitHub Release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # 7. Préparer les notes de release
+    - name: Generate release notes
+      shell: pwsh
       run: |
         $version = "${{ github.ref_name }}"
         $body = @"
@@ -107,15 +107,24 @@ jobs:
         
         **Compilé automatiquement par GitHub Actions** 🤖
         "@
+
+        Set-Content -Path "publish\RELEASE_NOTES.md" -Value $body -Encoding utf8
+
+    # 8. Créer la GitHub Release (sans dépendre de gh CLI)
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: Panosse ${{ github.ref_name }}
+        body_path: publish/RELEASE_NOTES.md
+        files: |
+          publish/Panosse-${{ github.ref_name }}.exe
+          publish/SHA256SUMS.txt
+        fail_on_unmatched_files: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
-        # Créer la release avec gh CLI
-        gh release create $version `
-          --title "Panosse $version" `
-          --notes $body `
-          publish\Panosse-$version.exe `
-          publish\SHA256SUMS.txt
-        
-    # 8. Afficher un résumé
+    # 9. Afficher un résumé
     - name: Build Summary
       run: |
         Write-Host "================================" -ForegroundColor Green
