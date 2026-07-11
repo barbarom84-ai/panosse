@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography.X509Certificates;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -39,6 +39,7 @@ public sealed class UpdateOrchestrator : IUpdateOrchestrator, IDisposable
         string downloadUrl,
         string currentExePath,
         string? versionTag,
+        string? expectedSha256,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -90,7 +91,8 @@ public sealed class UpdateOrchestrator : IUpdateOrchestrator, IDisposable
             };
         }
 
-        ValidateDownloadedExecutable(targetPath);
+        await fileStream.FlushAsync(cancellationToken);
+        ValidateDownloadedExecutable(targetPath, expectedSha256);
 
         telemetryService.Increment("update_install_download_success_count");
         sw.Stop();
@@ -115,10 +117,18 @@ public sealed class UpdateOrchestrator : IUpdateOrchestrator, IDisposable
         ThrowIfDisposed();
         string tempDir = Path.GetTempPath();
         string scriptPath = Path.Combine(tempDir, "PanosseUpdate.bat");
+        bool requiresElevation = RequiresElevation(currentExePath);
 
         string scriptContent = $@"@echo off
 chcp 65001 >nul
 setlocal enabledelayedexpansion
+{(requiresElevation ? """
+net session >nul 2>&1
+if errorlevel 1 (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs -WindowStyle Hidden"
+    exit /b 0
+)
+""" : string.Empty)}
 echo Mise a jour de Panosse en cours...
 echo.
 set /a compteur=0
@@ -142,7 +152,7 @@ if exist ""{currentExePath}.old"" del ""{currentExePath}.old""
 
         await File.WriteAllTextAsync(scriptPath, scriptContent, Encoding.UTF8, cancellationToken);
         telemetryService.Increment("update_install_script_generated_count");
-        logger.LogInfo("update", $"Install script generated for {versionTag ?? "latest"}.");
+        logger.LogInfo("update", $"Install script generated for {versionTag ?? "latest"} (elevation={(requiresElevation ? "yes" : "no")}).");
 
         return new UpdateInstallResult
         {
@@ -168,7 +178,7 @@ if exist ""{currentExePath}.old"" del ""{currentExePath}.old""
         Environment.Exit(0);
     }
 
-    private static void ValidateDownloadedExecutable(string filePath)
+    private static void ValidateDownloadedExecutable(string filePath, string? expectedSha256)
     {
         var fileInfo = new FileInfo(filePath);
         if (!fileInfo.Exists || fileInfo.Length <= 0)
@@ -176,18 +186,48 @@ if exist ""{currentExePath}.old"" del ""{currentExePath}.old""
             throw new InvalidOperationException("Le fichier de mise à jour téléchargé est invalide.");
         }
 
-        try
+        if (string.IsNullOrWhiteSpace(expectedSha256))
         {
-            // Integrity baseline: ensure executable has an Authenticode certificate.
-            // Signature chain trust can vary by machine policy; presence check is a safe minimum gate.
-#pragma warning disable SYSLIB0057
-            _ = X509Certificate.CreateFromSignedFile(filePath);
-#pragma warning restore SYSLIB0057
+            throw new InvalidOperationException("Empreinte SHA256 indisponible pour cette mise à jour.");
         }
-        catch (Exception ex)
+
+        string actualSha256 = ComputeSha256Hex(filePath);
+        if (!string.Equals(actualSha256, expectedSha256.Trim(), StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Le binaire téléchargé n'a pas de signature valide.", ex);
+            try
+            {
+                File.Delete(filePath);
+            }
+            catch
+            {
+                // Best effort cleanup of corrupted download.
+            }
+
+            throw new InvalidOperationException("L'empreinte SHA256 du binaire téléchargé ne correspond pas à la release.");
         }
+    }
+
+    private static string ComputeSha256Hex(string filePath)
+    {
+        using var sha256 = SHA256.Create();
+        using FileStream stream = File.OpenRead(filePath);
+        byte[] hash = sha256.ComputeHash(stream);
+        return Convert.ToHexString(hash);
+    }
+
+    private static bool RequiresElevation(string exePath)
+    {
+        if (string.IsNullOrWhiteSpace(exePath))
+        {
+            return false;
+        }
+
+        string fullPath = Path.GetFullPath(exePath);
+        string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        string programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+
+        return fullPath.StartsWith(programFiles, StringComparison.OrdinalIgnoreCase)
+            || fullPath.StartsWith(programFilesX86, StringComparison.OrdinalIgnoreCase);
     }
 
     public void Dispose()

@@ -46,6 +46,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
     private CancellationTokenSource? settingsAutoSaveDebounceCts;
     private string? updateDownloadUrl;
     private string? updateTagName;
+    private string? updateExpectedSha256;
     private string? preparedScriptPath;
     private bool checkUpdatesOnStartup = true;
     private bool playSuccessSound = true;
@@ -547,6 +548,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         IsUpdateAvailable = false;
         updateDownloadUrl = null;
         updateTagName = null;
+        updateExpectedSha256 = null;
         UpdateStatusText = "Verification des mises a jour...";
         UpdateProgressValue = 0;
 
@@ -568,7 +570,9 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
 
             updateTagName = result.ReleaseInfo.TagName;
             updateDownloadUrl = result.ReleaseInfo.DownloadUrl;
-            IsUpdateAvailable = !string.IsNullOrWhiteSpace(updateDownloadUrl);
+            updateExpectedSha256 = result.ReleaseInfo.ExpectedSha256;
+            IsUpdateAvailable = !string.IsNullOrWhiteSpace(updateDownloadUrl)
+                && !string.IsNullOrWhiteSpace(updateExpectedSha256);
             if (IsUpdateAvailable && !userChangedUpdatesExpanded && !IsUpdatesExpanded)
             {
                 suppressUpdatesExpandedTracking = true;
@@ -578,7 +582,9 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
 
             UpdateStatusText = IsUpdateAvailable
                 ? $"Mise a jour disponible: {updateTagName}"
-                : $"Mise a jour detectee ({updateTagName}) sans binaire .exe.";
+                : string.IsNullOrWhiteSpace(updateDownloadUrl)
+                    ? $"Mise a jour detectee ({updateTagName}) sans binaire .exe."
+                    : $"Mise a jour detectee ({updateTagName}) sans checksum SHA256.";
         }
         catch (Exception ex)
         {
@@ -596,6 +602,12 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         if (string.IsNullOrWhiteSpace(updateDownloadUrl))
         {
             UpdateStatusText = "Aucun lien de telechargement disponible.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(updateExpectedSha256))
+        {
+            UpdateStatusText = "Checksum SHA256 indisponible pour cette mise a jour.";
             return;
         }
 
@@ -619,7 +631,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
             await foreach (UpdateDownloadProgress progress in updateOrchestrator.DownloadAndPrepareInstallAsync(
                                updateDownloadUrl,
                                currentExePath,
-                               updateTagName))
+                               updateTagName,
+                               updateExpectedSha256))
             {
                 UpdateProgressValue = progress.ProgressPercent;
                 UpdateStatusText = progress.Message;

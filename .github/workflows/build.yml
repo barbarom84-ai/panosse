@@ -42,6 +42,21 @@ jobs:
           -p:DebugSymbols=false `
           -o publish
 
+    - name: Install Inno Setup
+      run: choco install innosetup --no-progress -y
+
+    - name: Build installer
+      shell: pwsh
+      run: |
+        $version = "${{ github.ref_name }}".TrimStart('v')
+        $iscc = @(
+          "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+          "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+        ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+        if (-not $iscc) { throw "ISCC.exe introuvable" }
+        & $iscc "/DMyAppVersion=$version" "Panosse-Setup.iss"
+        if ($LASTEXITCODE -ne 0) { throw "Compilation Inno Setup echouee" }
+
     - name: Rename executable
       run: |
         $version = "${{ github.ref_name }}"
@@ -70,9 +85,10 @@ jobs:
 
         ### Installation
 
-        Téléchargez ``Panosse-$version.exe`` et lancez-le (droits administrateur requis).
+        - **Portable** : téléchargez ``Panosse-$version.exe`` et lancez-le (aucune installation).
+        - **Installateur** : utilisez ``Panosse-Setup-$version.exe`` pour une installation classique dans Program Files.
 
-        **Version portable** : un seul exécutable self-contained, sans installation.
+        Les mises à jour depuis l'application vérifient l'intégrité via SHA256.
 
         ### Fonctionnalités
 
@@ -87,7 +103,7 @@ jobs:
         - Windows 10/11 (x64)
         - Droits administrateur pour certaines opérations
 
-        ### Checksum SHA256
+        ### Checksum SHA256 (portable)
 
         ``````
         ${{ steps.checksum.outputs.sha256 }}
@@ -104,6 +120,7 @@ jobs:
         files: |
           publish/Panosse-${{ github.ref_name }}.exe
           publish/SHA256SUMS.txt
+          installer/Panosse-Setup-${{ github.ref_name }}.exe
         fail_on_unmatched_files: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

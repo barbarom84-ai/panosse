@@ -27,7 +27,8 @@ Write-Host "  OK: $isccPath" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "Etape 3/3 : Compilation de l'installateur..." -ForegroundColor Yellow
-& $isccPath "Panosse-Setup.iss"
+$version = (Select-String -Path "src/Panosse.WinUI/Panosse.WinUI.csproj" -Pattern '<Version>([^<]+)</Version>' | ForEach-Object { $_.Matches[0].Groups[1].Value })
+& $isccPath "/DMyAppVersion=$version" "Panosse-Setup.iss"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERREUR: compilation Inno Setup echouee." -ForegroundColor Red
     exit 1

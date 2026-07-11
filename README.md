@@ -47,6 +47,11 @@ dotnet run --project src/Panosse.WinUI/Panosse.WinUI.csproj
 
 Le dossier `publish/` contient un **seul `Panosse.exe`** self-contained (~106 Mo), prêt à distribuer sans installateur.
 
+```powershell
+# Installateur Windows (Inno Setup 6 requis)
+.\_Scripts\creer-installateur.ps1
+```
+
 ## Version
 
 ```powershell

@@ -10,6 +10,7 @@ public interface IUpdateOrchestrator
         string downloadUrl,
         string currentExePath,
         string? versionTag,
+        string? expectedSha256,
         CancellationToken cancellationToken = default);
 
     Task<UpdateInstallResult> BuildInstallScriptAsync(
