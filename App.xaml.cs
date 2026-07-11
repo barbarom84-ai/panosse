@@ -2,6 +2,7 @@ using System.Windows;
 using System.IO;
 using System;
 using System.Threading;
+using Panosse.Services;
 
 namespace Panosse
 {
@@ -10,6 +11,7 @@ namespace Panosse
         // Mutex pour empêcher plusieurs instances de Panosse
         private Mutex? instanceMutex;
         private const string MUTEX_NAME = "Panosse_Unique_Mutex_99";
+        private ILoggerService? loggerService;
         
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -35,6 +37,7 @@ namespace Panosse
             }
             
             base.OnStartup(e);
+            loggerService = new LoggingService();
             
             // Capturer TOUTES les exceptions non gérées
             AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
@@ -60,6 +63,21 @@ namespace Panosse
                 );
                 args.Handled = true; // Empêcher le crash complet
             };
+
+            var cleanupService = new CleanupService();
+            var updateService = new UpdateService();
+            var settingsService = new SettingsService();
+            var telemetryService = new TelemetryService();
+            var historyService = new OperationHistoryService();
+
+            MainWindow window = new MainWindow(
+                cleanupService,
+                updateService,
+                settingsService,
+                telemetryService,
+                loggerService,
+                historyService);
+            window.Show();
         }
         
         protected override void OnExit(ExitEventArgs e)
@@ -100,6 +118,7 @@ InnerStackTrace :
 
 ";
                 File.AppendAllText(logPath, log);
+                loggerService?.LogError("app", $"{type}: {ex?.Message}", ex);
             }
             catch
             {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -113,9 +114,14 @@ public sealed class CleanupService : ICleanupService
         catch { }
     }
 
-    public long CleanOldDownloads()
+    public long CleanOldDownloads(IEnumerable<string>? exclusionPatterns = null)
     {
         long deletedSize = 0;
+        var patterns = exclusionPatterns?
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p.Trim())
+            .ToList() ?? new List<string>();
+
         try
         {
             string downloadsPath = Path.Combine(
@@ -140,6 +146,11 @@ public sealed class CleanupService : ICleanupService
             {
                 try
                 {
+                    if (IsExcluded(file.FullName, patterns))
+                    {
+                        continue;
+                    }
+
                     deletedSize += file.Length;
                     file.Delete();
                 }
@@ -155,6 +166,17 @@ public sealed class CleanupService : ICleanupService
         }
 
         return deletedSize;
+    }
+
+    private static bool IsExcluded(string candidatePath, IReadOnlyCollection<string> exclusionPatterns)
+    {
+        if (exclusionPatterns.Count == 0)
+        {
+            return false;
+        }
+
+        return exclusionPatterns.Any(pattern =>
+            candidatePath.Contains(pattern, StringComparison.OrdinalIgnoreCase));
     }
 
     public long CleanWindowsLogs()

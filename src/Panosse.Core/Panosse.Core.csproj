@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Services\ICleanupService.cs" Link="Services\ICleanupService.cs" />
+    <Compile Include="..\..\Services\CleanupService.cs" Link="Services\CleanupService.cs" />
+    <Compile Include="..\..\Services\ITelemetryService.cs" Link="Services\ITelemetryService.cs" />
+    <Compile Include="..\..\Services\TelemetryService.cs" Link="Services\TelemetryService.cs" />
+    <Compile Include="..\..\Services\TelemetryCounters.cs" Link="Services\TelemetryCounters.cs" />
+    <Compile Include="..\..\Services\ILoggerService.cs" Link="Services\ILoggerService.cs" />
+    <Compile Include="..\..\Services\LoggingService.cs" Link="Services\LoggingService.cs" />
+    <Compile Include="..\..\Services\IOperationHistoryService.cs" Link="Services\IOperationHistoryService.cs" />
+    <Compile Include="..\..\Services\OperationHistoryService.cs" Link="Services\OperationHistoryService.cs" />
+    <Compile Include="..\..\Services\OperationHistoryEntry.cs" Link="Services\OperationHistoryEntry.cs" />
+    <Compile Include="..\..\Services\ISettingsService.cs" Link="Services\ISettingsService.cs" />
+    <Compile Include="..\..\Services\SettingsService.cs" Link="Services\SettingsService.cs" />
+    <Compile Include="..\..\Services\AppSettings.cs" Link="Services\AppSettings.cs" />
+    <Compile Include="..\..\Services\PanosseJsonContext.cs" Link="Services\PanosseJsonContext.cs" />
+    <Compile Include="..\..\Services\CleanupExecutionOptions.cs" Link="Services\CleanupExecutionOptions.cs" />
+    <Compile Include="..\..\Services\CleanupStepUpdate.cs" Link="Services\CleanupStepUpdate.cs" />
+    <Compile Include="..\..\Services\CleanupRunResult.cs" Link="Services\CleanupRunResult.cs" />
+    <Compile Include="..\..\Services\CleanupPreviewItem.cs" Link="Services\CleanupPreviewItem.cs" />
+    <Compile Include="..\..\Services\ICleanupOrchestrator.cs" Link="Services\ICleanupOrchestrator.cs" />
+    <Compile Include="..\..\Services\CleanupOrchestrator.cs" Link="Services\CleanupOrchestrator.cs" />
+    <Compile Include="..\..\Services\IUpdateService.cs" Link="Services\IUpdateService.cs" />
+    <Compile Include="..\..\Services\UpdateService.cs" Link="Services\UpdateService.cs" />
+    <Compile Include="..\..\Services\UpdateCheckResult.cs" Link="Services\UpdateCheckResult.cs" />
+    <Compile Include="..\..\Services\IUpdateOrchestrator.cs" Link="Services\IUpdateOrchestrator.cs" />
+    <Compile Include="..\..\Services\UpdateOrchestrator.cs" Link="Services\UpdateOrchestrator.cs" />
+    <Compile Include="..\..\Services\UpdateDownloadProgress.cs" Link="Services\UpdateDownloadProgress.cs" />
+    <Compile Include="..\..\Services\UpdateInstallResult.cs" Link="Services\UpdateInstallResult.cs" />
+  </ItemGroup>
+
+</Project>

@@ -27,6 +27,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private bool checkUpdatesOnStartup = true;
     private bool playSuccessSound = true;
     private bool showTrayNotifications = true;
+    private bool previewModeEnabled;
+    private string exclusionPatterns = string.Empty;
+    private bool enableScheduledCleanup;
+    private int scheduledCleanupIntervalHours = 24;
+    private string historySummary = "Aucun historique disponible.";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -45,6 +50,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ICommand? OpenSettingsCommand { get; set; }
     public ICommand? CloseSettingsCommand { get; set; }
     public ICommand? SaveSettingsCommand { get; set; }
+    public ICommand? ShowHistoryCommand { get; set; }
 
     public string ButtonText
     {
@@ -152,6 +158,36 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         get => showTrayNotifications;
         set => SetField(ref showTrayNotifications, value);
+    }
+
+    public bool PreviewModeEnabled
+    {
+        get => previewModeEnabled;
+        set => SetField(ref previewModeEnabled, value);
+    }
+
+    public string ExclusionPatterns
+    {
+        get => exclusionPatterns;
+        set => SetField(ref exclusionPatterns, value);
+    }
+
+    public bool EnableScheduledCleanup
+    {
+        get => enableScheduledCleanup;
+        set => SetField(ref enableScheduledCleanup, value);
+    }
+
+    public int ScheduledCleanupIntervalHours
+    {
+        get => scheduledCleanupIntervalHours;
+        set => SetField(ref scheduledCleanupIntervalHours, value);
+    }
+
+    public string HistorySummary
+    {
+        get => historySummary;
+        set => SetField(ref historySummary, value);
     }
 
     private void SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

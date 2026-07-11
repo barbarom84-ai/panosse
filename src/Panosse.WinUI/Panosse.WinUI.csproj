@@ -16,10 +16,20 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <RootNamespace>Panosse.WinUI</RootNamespace>
 
+        <!-- Informations de version -->
+        <Version>2.1.2</Version>
+        <AssemblyVersion>2.1.2.0</AssemblyVersion>
+        <FileVersion>2.1.2.0</FileVersion>
+        <Company>Marco Barbaro</Company>
+        <Product>Panosse - La serpillère numérique</Product>
+        <Copyright>Copyright © 2026 Marco Barbaro</Copyright>
+        <Description>La serpillère numérique pour un PC tout propre</Description>
+
         <!-- App Options -->
         <UseRidGraph>true</UseRidGraph>
         <Platforms>x86;x64;ARM64</Platforms>
         <ApplicationManifest>app.manifest</ApplicationManifest>
+        <ApplicationIcon>Assets\panosse.ico</ApplicationIcon>
         <PublishProfile>win-$(Platform).pubxml</PublishProfile>
         <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetFrameworkVersion('$(TargetFramework)')) &gt;= 8">win-x86;win-x64;win-arm64</RuntimeIdentifiers>
         <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetFrameworkVersion('$(TargetFramework)')) &lt; 8">win10-x86;win10-x64;win10-arm64</RuntimeIdentifiers>
@@ -39,6 +49,8 @@
         <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
         <Content Include="Assets\StoreLogo.png" />
         <Content Include="Assets\Wide310x150Logo.scale-200.png" />
+        <Content Include="Assets\panosse.png" />
+        <None Include="Assets\panosse.ico" />
     </ItemGroup>
 
     <ItemGroup>

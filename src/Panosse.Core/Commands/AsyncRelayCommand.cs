@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
-namespace Panosse.ViewModels;
+namespace Panosse.Core.Commands;
 
 public sealed class AsyncRelayCommand : ICommand
 {

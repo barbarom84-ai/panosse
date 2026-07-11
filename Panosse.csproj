@@ -44,5 +44,13 @@
     <Resource Include="assets\panosse_sale.ico" />
   </ItemGroup>
 
+  <!-- Exclure les nouveaux projets WinUI/Core du scope de compilation WPF -->
+  <ItemGroup>
+    <Compile Remove="src\**\*.cs" />
+    <Page Remove="src\**\*.xaml" />
+    <None Remove="src\**\*" />
+    <EmbeddedResource Remove="src\**\*" />
+  </ItemGroup>
+
 </Project>
 

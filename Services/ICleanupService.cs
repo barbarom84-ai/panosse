@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Panosse.Services;
@@ -9,7 +10,7 @@ public interface ICleanupService
     long CleanChromeCache();
     long CleanEdgeCache();
     void CleanRegistry();
-    long CleanOldDownloads();
+    long CleanOldDownloads(IEnumerable<string>? exclusionPatterns = null);
     long CleanWindowsLogs();
     long CleanThumbnailCache();
 }

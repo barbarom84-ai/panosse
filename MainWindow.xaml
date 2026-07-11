@@ -160,6 +160,8 @@
             <MenuItem Header="🔧 _Outils" FontSize="12" Padding="10,5">
                 <MenuItem Header="⚙️ _Paramètres" Command="{Binding OpenSettingsCommand}" />
                 <Separator />
+                <MenuItem Header="🕘 _Historique des opérations" Command="{Binding ShowHistoryCommand}" />
+                <Separator />
                 <MenuItem Header="🔍 _Vérifier les mises à jour" Command="{Binding CheckUpdatesCommand}" />
                 <Separator />
                 <MenuItem Header="🌐 _Ouvrir le dépôt GitHub" Command="{Binding OpenGitHubCommand}" />
@@ -413,6 +415,8 @@
               Background="#CC000000"
               Visibility="Collapsed"
               Opacity="0"
+              FocusManager.IsFocusScope="True"
+              FocusManager.FocusedElement="{Binding ElementName=BtnRetourAPropos}"
               MouseLeftButtonDown="OverlayAPropos_MouseDown">
             
             <!-- Panneau À propos -->
@@ -558,7 +562,8 @@
                     </TextBlock>
                     
                     <!-- Bouton Retour -->
-                    <Button Content="Retour"
+                    <Button x:Name="BtnRetourAPropos"
+                            Content="_Retour"
                             Command="{Binding CloseAboutCommand}"
                             Background="#2196F3"
                             Foreground="White"
@@ -568,7 +573,8 @@
                             FontWeight="SemiBold"
                             Cursor="Hand"
                             HorizontalAlignment="Center"
-                            Margin="0,0,0,4">
+                            Margin="0,0,0,4"
+                            IsCancel="True">
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Background" Value="#2196F3"/>
@@ -603,13 +609,15 @@
         <!-- Overlay Paramètres -->
         <Grid x:Name="OverlaySettings"
               Background="#CC000000"
+              FocusManager.IsFocusScope="True"
+              FocusManager.FocusedElement="{Binding ElementName=ChkCheckUpdatesOnStartup}"
               Visibility="Collapsed"
               MouseLeftButtonDown="OverlaySettings_MouseDown">
 
             <Border Background="White"
                     CornerRadius="15"
                     Width="340"
-                    MaxHeight="420"
+                    MaxHeight="560"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Center"
                     Padding="24,22,24,20">
@@ -617,6 +625,9 @@
                     <DropShadowEffect BlurRadius="30" ShadowDepth="0" Opacity="0.3"/>
                 </Border.Effect>
 
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              MaxHeight="520">
                 <StackPanel>
                     <TextBlock Text="⚙️ Paramètres"
                                FontSize="24"
@@ -627,7 +638,8 @@
 
                     <Border Height="1" Background="#E0E0E0" Margin="0,0,0,16"/>
 
-                    <CheckBox Content="Vérifier les mises à jour au démarrage"
+                    <CheckBox x:Name="ChkCheckUpdatesOnStartup"
+                              Content="Vérifier les mises à jour au démarrage"
                               IsChecked="{Binding CheckUpdatesOnStartup}"
                               FontSize="13"
                               Foreground="#424242"
@@ -645,6 +657,58 @@
                               Foreground="#424242"
                               Margin="0,0,0,18"/>
 
+                    <CheckBox Content="Activer le mode prévisualisation (sans suppression)"
+                              IsChecked="{Binding PreviewModeEnabled}"
+                              FontSize="13"
+                              Foreground="#424242"
+                              Margin="0,0,0,12"/>
+
+                    <TextBlock Text="Exclusions intelligentes (mots-clés, séparés par virgules)"
+                               FontSize="11"
+                               Foreground="#757575"
+                               Margin="0,0,0,4"/>
+                    <TextBox Text="{Binding ExclusionPatterns, UpdateSourceTrigger=PropertyChanged}"
+                             FontSize="12"
+                             Height="28"
+                             Padding="8,4"
+                             Margin="0,0,0,12"/>
+
+                    <CheckBox Content="Activer le nettoyage planifié"
+                              IsChecked="{Binding EnableScheduledCleanup}"
+                              FontSize="13"
+                              Foreground="#424242"
+                              Margin="0,0,0,8"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12" VerticalAlignment="Center">
+                        <TextBlock Text="Intervalle (heures):"
+                                   FontSize="12"
+                                   Foreground="#616161"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        <TextBox Text="{Binding ScheduledCleanupIntervalHours, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="60"
+                                 Height="26"
+                                 Padding="6,3"
+                                 FontSize="12"/>
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding HistorySummary}"
+                               FontSize="11"
+                               Foreground="#9E9E9E"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8"/>
+
+                    <Button Content="Voir l'historique"
+                            Command="{Binding ShowHistoryCommand}"
+                            Background="#F5F5F5"
+                            Foreground="#424242"
+                            BorderThickness="0"
+                            Padding="12,6"
+                            FontSize="12"
+                            Cursor="Hand"
+                            HorizontalAlignment="Left"
+                            Margin="0,0,0,12"/>
+
                     <TextBlock Text="Ces préférences sont sauvegardées automatiquement."
                                FontSize="11"
                                Foreground="#9E9E9E"
@@ -652,7 +716,7 @@
                                Margin="0,0,0,18"/>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Content="Annuler"
+                        <Button Content="_Annuler"
                                 Command="{Binding CloseSettingsCommand}"
                                 Background="#EEEEEE"
                                 Foreground="#616161"
@@ -660,18 +724,21 @@
                                 Padding="18,8"
                                 FontSize="13"
                                 Margin="0,0,10,0"
-                                Cursor="Hand"/>
+                                Cursor="Hand"
+                                IsCancel="True"/>
 
-                        <Button Content="Enregistrer"
+                        <Button Content="_Enregistrer"
                                 Command="{Binding SaveSettingsCommand}"
                                 Background="#2196F3"
                                 Foreground="White"
                                 BorderThickness="0"
                                 Padding="18,8"
                                 FontSize="13"
-                                Cursor="Hand"/>
+                                Cursor="Hand"
+                                IsDefault="True"/>
                     </StackPanel>
                 </StackPanel>
+                </ScrollViewer>
             </Border>
         </Grid>
     </Grid>

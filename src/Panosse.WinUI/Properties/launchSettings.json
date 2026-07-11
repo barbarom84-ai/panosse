@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Panosse.WinUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Panosse.WinUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

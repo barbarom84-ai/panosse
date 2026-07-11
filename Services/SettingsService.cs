@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Text.Json;
 
 namespace Panosse.Services;
 
@@ -25,7 +24,9 @@ public sealed class SettingsService : ISettingsService
             }
 
             string json = File.ReadAllText(settingsPath);
-            AppSettings? settings = JsonSerializer.Deserialize<AppSettings>(json);
+            AppSettings? settings = System.Text.Json.JsonSerializer.Deserialize(
+                json,
+                PanosseJsonContext.Default.AppSettings);
             return settings ?? new AppSettings();
         }
         catch
@@ -44,10 +45,9 @@ public sealed class SettingsService : ISettingsService
                 Directory.CreateDirectory(directory);
             }
 
-            string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            string json = System.Text.Json.JsonSerializer.Serialize(
+                settings,
+                PanosseJsonContext.Default.AppSettings);
             File.WriteAllText(settingsPath, json);
         }
         catch

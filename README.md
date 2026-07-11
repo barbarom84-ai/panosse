@@ -127,6 +127,18 @@ Consultez `INNO-SETUP-GUIDE.md` pour plus de détails.
 ### Checklist de release mensuelle
 
 Consultez `docs/release/monthly-release-checklist.md` avant chaque publication.
+Pour la migration WinUI, utilisez aussi `docs/release/winui-rc-checklist.md`.
+Les release notes WinUI beta sont disponibles dans `docs/release/winui-v3-beta-release-notes.md`.
+
+### Build de la solution multi-projets (WPF + WinUI)
+
+```powershell
+# Build global
+dotnet build Panosse.slnx
+
+# Build release pour validation RC WinUI
+dotnet build Panosse.slnx -c Release
+```
 
 ### Roadmap 2026 (documents d'exécution)
 

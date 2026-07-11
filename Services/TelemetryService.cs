@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Text.Json;
 
 namespace Panosse.Services;
 
@@ -8,7 +7,6 @@ public sealed class TelemetryService : ITelemetryService
 {
     private readonly object syncRoot = new();
     private readonly string countersPath;
-    private readonly JsonSerializerOptions serializerOptions = new() { WriteIndented = true };
 
     public TelemetryService()
     {
@@ -39,6 +37,30 @@ public sealed class TelemetryService : ITelemetryService
         }
     }
 
+    public void RecordDuration(string metricName, TimeSpan duration)
+    {
+        if (string.IsNullOrWhiteSpace(metricName))
+        {
+            return;
+        }
+
+        long durationMs = Math.Max(0, (long)duration.TotalMilliseconds);
+        lock (syncRoot)
+        {
+            TelemetryCounters counters = LoadNoThrow();
+            string totalKey = $"{metricName}_total_ms";
+            string countKey = $"{metricName}_count";
+
+            counters.Counters.TryGetValue(totalKey, out long currentTotal);
+            counters.Counters.TryGetValue(countKey, out long currentCount);
+
+            counters.Counters[totalKey] = currentTotal + durationMs;
+            counters.Counters[countKey] = currentCount + 1;
+            counters.LastUpdatedUtc = DateTime.UtcNow;
+            SaveNoThrow(counters);
+        }
+    }
+
     private TelemetryCounters LoadNoThrow()
     {
         try
@@ -49,7 +71,9 @@ public sealed class TelemetryService : ITelemetryService
             }
 
             string json = File.ReadAllText(countersPath);
-            TelemetryCounters? counters = JsonSerializer.Deserialize<TelemetryCounters>(json);
+            TelemetryCounters? counters = System.Text.Json.JsonSerializer.Deserialize(
+                json,
+                PanosseJsonContext.Default.TelemetryCounters);
             return counters ?? new TelemetryCounters();
         }
         catch
@@ -68,7 +92,9 @@ public sealed class TelemetryService : ITelemetryService
                 Directory.CreateDirectory(directory);
             }
 
-            string json = JsonSerializer.Serialize(counters, serializerOptions);
+            string json = System.Text.Json.JsonSerializer.Serialize(
+                counters,
+                PanosseJsonContext.Default.TelemetryCounters);
             File.WriteAllText(countersPath, json);
         }
         catch

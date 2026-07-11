@@ -108,29 +108,29 @@ public sealed class UpdateService : IUpdateService
 
     private static bool IsRemoteVersionNewer(string remoteVersion, string localVersion)
     {
+        static Version NormalizeVersion(string input)
+        {
+            string cleaned = input.Split('-')[0].Trim();
+            if (Version.TryParse(cleaned, out Version? parsed))
+            {
+                return parsed;
+            }
+
+            string[] tokens = cleaned.Split('.');
+            while (tokens.Length < 3)
+            {
+                cleaned += ".0";
+                tokens = cleaned.Split('.');
+            }
+
+            return Version.TryParse(cleaned, out parsed) ? parsed : new Version(0, 0, 0);
+        }
+
         try
         {
-            remoteVersion = remoteVersion.Split('-')[0];
-            localVersion = localVersion.Split('-')[0];
-
-            var remoteParts = remoteVersion.Split('.').Select(int.Parse).ToArray();
-            var localParts = localVersion.Split('.').Select(int.Parse).ToArray();
-
-            if (remoteParts[0] > localParts[0]) return true;
-            if (remoteParts[0] < localParts[0]) return false;
-
-            if (remoteParts.Length > 1 && localParts.Length > 1)
-            {
-                if (remoteParts[1] > localParts[1]) return true;
-                if (remoteParts[1] < localParts[1]) return false;
-            }
-
-            if (remoteParts.Length > 2 && localParts.Length > 2)
-            {
-                if (remoteParts[2] > localParts[2]) return true;
-            }
-
-            return false;
+            Version remote = NormalizeVersion(remoteVersion);
+            Version local = NormalizeVersion(localVersion);
+            return remote > local;
         }
         catch
         {
