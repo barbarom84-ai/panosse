@@ -154,6 +154,11 @@ namespace Panosse.WinUI.Views
 
         private async void MenuCheckUpdates_Click(object sender, RoutedEventArgs e)
         {
+            await CheckForUpdatesAsync(showDialog: sender is not Button);
+        }
+
+        private async Task CheckForUpdatesAsync(bool showDialog)
+        {
             if (!ViewModel.CheckUpdatesCommand.CanExecute(null))
             {
                 ViewModel.StatusText = "Verification deja en cours...";
@@ -163,7 +168,6 @@ namespace Panosse.WinUI.Views
             ViewModel.StatusText = "Verification des mises a jour en cours...";
             ViewModel.CheckUpdatesCommand.Execute(null);
 
-            // Wait until the view model finishes the async check.
             int guard = 0;
             while (ViewModel.IsCheckingUpdate && guard < 200)
             {
@@ -176,14 +180,61 @@ namespace Panosse.WinUI.Views
                 : ViewModel.UpdateStatusText;
             ViewModel.StatusText = result;
 
+            if (!showDialog)
+            {
+                return;
+            }
+
             var dialog = new ContentDialog
             {
                 Title = "Mises a jour",
                 Content = result,
-                CloseButtonText = "OK",
+                CloseButtonText = ViewModel.IsUpdateAvailable ? "Plus tard" : "OK",
                 XamlRoot = this.XamlRoot
             };
-            _ = await dialog.ShowAsync();
+
+            if (ViewModel.IsUpdateAvailable)
+            {
+                dialog.PrimaryButtonText = "Telecharger";
+            }
+
+            ContentDialogResult dialogResult = await dialog.ShowAsync();
+            if (dialogResult == ContentDialogResult.Primary && ViewModel.IsUpdateAvailable)
+            {
+                await RunUpdateInstallAsync();
+            }
+        }
+
+        private async Task RunUpdateInstallAsync()
+        {
+            if (!ViewModel.PrepareUpdateCommand.CanExecute(null))
+            {
+                return;
+            }
+
+            ViewModel.PrepareUpdateCommand.Execute(null);
+
+            int guard = 0;
+            while (ViewModel.IsPreparingUpdate && guard < 1200)
+            {
+                await Task.Delay(100);
+                guard++;
+            }
+
+            if (!ViewModel.InstallPreparedUpdateCommand.CanExecute(null))
+            {
+                var errorDialog = new ContentDialog
+                {
+                    Title = "Mise a jour",
+                    Content = ViewModel.UpdateStatusText,
+                    CloseButtonText = "OK",
+                    XamlRoot = this.XamlRoot
+                };
+                _ = await errorDialog.ShowAsync();
+                return;
+            }
+
+            ViewModel.InstallPreparedUpdateCommand.Execute(null);
         }
 
         private async void AboutCheckUpdatesButton_Click(object sender, RoutedEventArgs e)
@@ -194,8 +245,7 @@ namespace Panosse.WinUI.Views
 
             try
             {
-                MenuCheckUpdates_Click(sender, e);
-                await Task.Delay(200);
+                await CheckForUpdatesAsync(showDialog: false);
                 AboutLastCheckText.Text = $"Dernière vérification : {DateTime.Now:HH:mm:ss}";
             }
             finally

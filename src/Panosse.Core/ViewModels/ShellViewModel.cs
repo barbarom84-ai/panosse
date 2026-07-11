@@ -258,6 +258,10 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
+    public bool IsInstallReady => !string.IsNullOrWhiteSpace(preparedScriptPath);
+
+    public bool IsUpdateProgressVisible => IsPreparingUpdate;
+
     public string UpdateHeaderText => IsUpdateAvailable ? "Mises a jour - Nouveau" : "Mises a jour";
 
     public bool IsUpdatesExpanded
@@ -329,6 +333,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
                 (CheckUpdatesCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 (PrepareUpdateCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 (InstallPreparedUpdateCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsUpdateProgressVisible)));
             }
         }
     }
@@ -549,6 +554,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         updateDownloadUrl = null;
         updateTagName = null;
         updateExpectedSha256 = null;
+        preparedScriptPath = null;
+        NotifyInstallReadyChanged();
         UpdateStatusText = "Verification des mises a jour...";
         UpdateProgressValue = 0;
 
@@ -648,8 +655,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
             }
 
             preparedScriptPath = result.ScriptPath;
-            UpdateStatusText = "Mise a jour preparee. Script pret.";
-            (InstallPreparedUpdateCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            UpdateStatusText = "Mise a jour preparee. Cliquez sur Installer.";
+            NotifyInstallReadyChanged();
         }
         catch (Exception ex)
         {
@@ -880,6 +887,12 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         {
             loggerService.LogError("winui-settings", "Failed to auto-save settings.", ex);
         }
+    }
+
+    private void NotifyInstallReadyChanged()
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsInstallReady)));
+        (InstallPreparedUpdateCommand as RelayCommand)?.RaiseCanExecuteChanged();
     }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

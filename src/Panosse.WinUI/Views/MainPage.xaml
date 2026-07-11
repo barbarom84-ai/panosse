@@ -7,6 +7,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:Panosse.WinUI"
+    xmlns:converters="using:Panosse.WinUI.Converters"
     xmlns:sys="using:System"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
@@ -115,6 +116,8 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="FontSize" Value="11"/>
         </Style>
+
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </Page.Resources>
 
     <Grid>
@@ -451,7 +454,35 @@
                                FontSize="12"
                                Foreground="{StaticResource AppMutedTextColor}"
                                HorizontalAlignment="Center"
-                               Margin="0,0,0,16" />
+                               Margin="0,0,0,8" />
+
+                    <StackPanel Spacing="8"
+                                HorizontalAlignment="Stretch"
+                                MaxWidth="360"
+                                Margin="0,0,0,12"
+                                Visibility="{x:Bind ViewModel.IsUpdateAvailable, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{x:Bind ViewModel.UpdateStatusText, Mode=OneWay}"
+                                   FontSize="13"
+                                   Foreground="{StaticResource AppSuccessColor}"
+                                   TextWrapping="WrapWholeWords"
+                                   TextAlignment="Center" />
+                        <ProgressBar Minimum="0"
+                                     Maximum="100"
+                                     Value="{x:Bind ViewModel.UpdateProgressValue, Mode=OneWay}"
+                                     Height="6"
+                                     Foreground="{StaticResource AppSuccessColor}"
+                                     Background="{StaticResource AppBorderColor}"
+                                     Visibility="{x:Bind ViewModel.IsUpdateProgressVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <Button Content="⬇️ Télécharger la mise à jour"
+                                Command="{x:Bind ViewModel.PrepareUpdateCommand}"
+                                Style="{StaticResource AboutUpdateButtonStyle}"
+                                HorizontalAlignment="Stretch" />
+                        <Button Content="✅ Installer maintenant"
+                                Command="{x:Bind ViewModel.InstallPreparedUpdateCommand}"
+                                Style="{StaticResource PrimaryActionButtonStyle}"
+                                HorizontalAlignment="Stretch"
+                                Visibility="{x:Bind ViewModel.IsInstallReady, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    </StackPanel>
 
                     <TextBlock Text="La serpillère numérique"
                                FontSize="17"
