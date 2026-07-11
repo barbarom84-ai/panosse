@@ -1,4 +1,4 @@
-# Script de publication Panosse (WinUI 3)
+# Publication portable single-file Panosse (WinUI 3)
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64"
@@ -8,7 +8,7 @@ $projectPath = "src/Panosse.WinUI/Panosse.WinUI.csproj"
 $publishDir = "publish"
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "   Publication Panosse WinUI           " -ForegroundColor Cyan
+Write-Host "   Publication portable Panosse          " -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -21,14 +21,20 @@ if (Test-Path $publishDir) {
     Remove-Item $publishDir -Recurse -Force
 }
 
-Write-Host "Compilation et publication..." -ForegroundColor Yellow
+Write-Host "Compilation single-file self-contained..." -ForegroundColor Yellow
 dotnet publish $projectPath `
     -c $Configuration `
     -r $Runtime `
     -p:Platform=x64 `
     -p:SelfContained=true `
-    -p:PublishTrimmed=true `
-    -p:TrimMode=partial `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:EnableCompressionInSingleFile=true `
+    -p:WindowsAppSDKSelfContained=true `
+    -p:IncludeAllContentForSelfExtract=true `
+    -p:PublishTrimmed=false `
+    -p:DebugType=none `
+    -p:DebugSymbols=false `
     -o $publishDir
 
 if ($LASTEXITCODE -ne 0) {
@@ -43,8 +49,15 @@ if (-not (Test-Path $exePath)) {
 }
 
 $sizeMb = [math]::Round((Get-Item $exePath).Length / 1MB, 2)
+$hash = (Get-FileHash -Path $exePath -Algorithm SHA256).Hash
+
 Write-Host ""
 Write-Host "Publication reussie." -ForegroundColor Green
 Write-Host "  Fichier : $((Resolve-Path $exePath).Path)" -ForegroundColor White
 Write-Host "  Taille  : $sizeMb Mo" -ForegroundColor White
+Write-Host "  SHA256  : $hash" -ForegroundColor White
 Write-Host ""
+Write-Host "Version portable: un seul executable, aucune installation requise." -ForegroundColor Cyan
+Write-Host ""
+
+Set-Content -Path (Join-Path $publishDir "SHA256SUMS.txt") -Value "$hash  Panosse.exe" -Encoding ascii

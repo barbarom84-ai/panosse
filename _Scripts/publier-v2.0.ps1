@@ -1,3 +1,4 @@
+# OBSOLETE — utiliser .\_Scripts\publier.ps1 (WinUI 3 single-file portable)
 # ============================================
 # Script de publication Panosse v2.0.0
 # ============================================
