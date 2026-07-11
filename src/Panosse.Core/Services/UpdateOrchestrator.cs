@@ -57,41 +57,43 @@ public sealed class UpdateOrchestrator : IUpdateOrchestrator, IDisposable
         long totalBytes = response.Content.Headers.ContentLength ?? 0;
 
         await using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        await using var fileStream = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
-
-        var buffer = new byte[81920];
-        long totalRead = 0;
-        int read;
-        int lastProgress = -1;
-        DateTime lastUiUpdateUtc = DateTime.UtcNow;
-
-        while ((read = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken)) > 0)
+        await using (var fileStream = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
         {
-            await fileStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-            totalRead += read;
+            var buffer = new byte[81920];
+            long totalRead = 0;
+            int read;
+            int lastProgress = -1;
+            DateTime lastUiUpdateUtc = DateTime.UtcNow;
 
-            if (totalBytes <= 0)
+            while ((read = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken)) > 0)
             {
-                continue;
+                await fileStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                totalRead += read;
+
+                if (totalBytes <= 0)
+                {
+                    continue;
+                }
+
+                int progress = (int)((totalRead * 100) / totalBytes);
+                bool shouldEmit = progress != lastProgress && (progress - lastProgress >= 2 || (DateTime.UtcNow - lastUiUpdateUtc).TotalMilliseconds >= 200);
+                if (!shouldEmit)
+                {
+                    continue;
+                }
+
+                lastProgress = progress;
+                lastUiUpdateUtc = DateTime.UtcNow;
+                yield return new UpdateDownloadProgress
+                {
+                    ProgressPercent = progress,
+                    Message = $"Téléchargement de la mise à jour... {progress}%"
+                };
             }
 
-            int progress = (int)((totalRead * 100) / totalBytes);
-            bool shouldEmit = progress != lastProgress && (progress - lastProgress >= 2 || (DateTime.UtcNow - lastUiUpdateUtc).TotalMilliseconds >= 200);
-            if (!shouldEmit)
-            {
-                continue;
-            }
-
-            lastProgress = progress;
-            lastUiUpdateUtc = DateTime.UtcNow;
-            yield return new UpdateDownloadProgress
-            {
-                ProgressPercent = progress,
-                Message = $"Téléchargement de la mise à jour... {progress}%"
-            };
+            await fileStream.FlushAsync(cancellationToken);
         }
 
-        await fileStream.FlushAsync(cancellationToken);
         ValidateDownloadedExecutable(targetPath, expectedSha256);
 
         telemetryService.Increment("update_install_download_success_count");
@@ -150,7 +152,7 @@ start """" ""{currentExePath}""
 if exist ""{currentExePath}.old"" del ""{currentExePath}.old""
 (goto) 2>nul & del ""%~f0""";
 
-        await File.WriteAllTextAsync(scriptPath, scriptContent, Encoding.UTF8, cancellationToken);
+        await File.WriteAllTextAsync(scriptPath, scriptContent, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), cancellationToken);
         telemetryService.Increment("update_install_script_generated_count");
         logger.LogInfo("update", $"Install script generated for {versionTag ?? "latest"} (elevation={(requiresElevation ? "yes" : "no")}).");
 
