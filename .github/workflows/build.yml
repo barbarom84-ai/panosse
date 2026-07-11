@@ -3,114 +3,90 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'  # Déclenche sur tous les tags commençant par 'v' (ex: v1.0.0, v1.1.0, etc.)
+      - 'v*'
   workflow_dispatch:
 
 permissions:
-  contents: write  # Nécessaire pour créer des releases
+  contents: write
 
 jobs:
   build-and-release:
     runs-on: windows-latest
-    
+
     steps:
-    # 1. Récupérer le code source
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    # 2. Installer .NET 8.0
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'
-        
-    # 3. Restaurer les dépendances
+        dotnet-version: '10.0.x'
+
     - name: Restore dependencies
-      run: dotnet restore Panosse.csproj
-      
-    # 4. Compiler en mode Release (Single File)
-    - name: Build Release
+      run: dotnet restore Panosse.slnx
+
+    - name: Publish WinUI Release
       run: |
-        dotnet publish Panosse.csproj `
+        dotnet publish src/Panosse.WinUI/Panosse.WinUI.csproj `
           -c Release `
           -r win-x64 `
-          --self-contained true `
-          -p:PublishSingleFile=true `
-          -p:IncludeNativeLibrariesForSelfExtract=true `
-          -p:EnableCompressionInSingleFile=true `
-          -p:PublishReadyToRun=true `
+          -p:Platform=x64 `
+          -p:SelfContained=true `
+          -p:PublishTrimmed=true `
+          -p:TrimMode=partial `
           -o publish
-          
-    # 5. Renommer l'exécutable avec la version
+
     - name: Rename executable
       run: |
         $version = "${{ github.ref_name }}"
-        Move-Item -Path "publish\Panosse.exe" -Destination "publish\Panosse-$version.exe"
-        Write-Host "Fichier renommé en Panosse-$version.exe"
-        
-    # 6. Calculer le checksum SHA256
+        if (Test-Path "publish\Panosse.exe") {
+          Move-Item -Path "publish\Panosse.exe" -Destination "publish\Panosse-$version.exe" -Force
+        } else {
+          throw "publish\Panosse.exe introuvable"
+        }
+
     - name: Calculate SHA256
       id: checksum
       run: |
         $version = "${{ github.ref_name }}"
         $hash = (Get-FileHash -Path "publish\Panosse-$version.exe" -Algorithm SHA256).Hash
         echo "sha256=$hash" >> $env:GITHUB_OUTPUT
-        Write-Host "SHA256: $hash"
-        # Créer un fichier de checksums
         echo "$hash  Panosse-$version.exe" > publish\SHA256SUMS.txt
-        
-    # 7. Préparer les notes de release
+
     - name: Generate release notes
       shell: pwsh
       run: |
         $version = "${{ github.ref_name }}"
         $body = @"
-        ## 🧹 Panosse $version
-        
-        **La serpillère numérique pour un PC tout propre !**
-        
-        ### 📦 Installation
-        
-        Téléchargez ``Panosse-$version.exe`` ci-dessous et lancez-le.
-        
-        **Aucune installation requise** - Version portable complète.
-        
-        ### ✨ Fonctionnalités
-        
-        - 🗑️ Vidage de la corbeille
-        - 🧹 Nettoyage fichiers temporaires
-        - 🌐 Cache navigateurs (Chrome, Firefox, Edge)
-        - 📋 Nettoyage registre (RunMRU, RecentDocs)
-        - 📥 Suppression .exe/.msi anciens (Téléchargements)
-        - 📄 Nettoyage logs Windows
-        - 🖼️ Cache miniatures
-        - 📊 Progression détaillée avec animations
-        - 🔄 Mise à jour automatique
-        
-        ### ⚠️ Prérequis
-        
-        - **Windows 10/11** (64-bit)
-        - **Droits administrateur** (certaines fonctions)
-        - **.NET 8.0** inclus (self-contained)
-        
-        ### 🔐 Checksum SHA256
-        
+        ## Panosse $version (WinUI 3)
+
+        La serpillère numérique pour un PC tout propre.
+
+        ### Installation
+
+        Téléchargez ``Panosse-$version.exe`` et lancez-le (droits administrateur requis).
+
+        ### Fonctionnalités
+
+        - Nettoyage complet (temp, caches, corbeille, registre)
+        - Mode prévisualisation et exclusions intelligentes
+        - Historique des opérations et planification
+        - Mises à jour automatiques
+        - Raccourci global Ctrl+Alt+P et icône barre des tâches
+
+        ### Prérequis
+
+        - Windows 10/11 (x64)
+        - Droits administrateur pour certaines opérations
+
+        ### Checksum SHA256
+
         ``````
         ${{ steps.checksum.outputs.sha256 }}
         ``````
-        
-        ### 🐛 Signaler un bug
-        
-        Ouvrez une issue : https://github.com/${{ github.repository }}/issues
-        
-        ---
-        
-        **Compilé automatiquement par GitHub Actions** 🤖
         "@
-
         Set-Content -Path "publish\RELEASE_NOTES.md" -Value $body -Encoding utf8
 
-    # 8. Créer la GitHub Release (sans dépendre de gh CLI)
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
@@ -123,17 +99,3 @@ jobs:
         fail_on_unmatched_files: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    # 9. Afficher un résumé
-    - name: Build Summary
-      run: |
-        Write-Host "================================" -ForegroundColor Green
-        Write-Host "BUILD RÉUSSI !" -ForegroundColor Green
-        Write-Host "================================" -ForegroundColor Green
-        Write-Host ""
-        Write-Host "Version: ${{ github.ref_name }}" -ForegroundColor Cyan
-        Write-Host "Fichier: Panosse-${{ github.ref_name }}.exe" -ForegroundColor Cyan
-        Write-Host "SHA256: ${{ steps.checksum.outputs.sha256 }}" -ForegroundColor Cyan
-        Write-Host ""
-        Write-Host "Release disponible sur:" -ForegroundColor Yellow
-        Write-Host "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}" -ForegroundColor Blue

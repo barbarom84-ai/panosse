@@ -105,6 +105,10 @@ $RECYCLE.BIN/
 
 # Backup files
 *.bak
+*.bak2
 *.backup
 *~
 
+# WinUI publish outputs
+publish-winui-*/
+**/bin/Release/publish*/

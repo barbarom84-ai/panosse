@@ -4,6 +4,7 @@ using Panosse.Core.ViewModels;
 using Panosse.Services;
 using Panosse.WinUI.Services;
 using Panosse.WinUI.Views;
+using System.Runtime.InteropServices;
 using WinRT.Interop;
 
 namespace Panosse.WinUI
@@ -13,6 +14,9 @@ namespace Panosse.WinUI
     /// </summary>
     public partial class App : Application
     {
+        private static Mutex? instanceMutex;
+        private const string MutexName = "Panosse_Unique_Mutex_99";
+
         private Window? window;
         private ISystemTrayService? systemTrayService;
         private IGlobalHotkeyService? globalHotkeyService;
@@ -22,12 +26,18 @@ namespace Panosse.WinUI
 
         public IServiceProvider Services { get; }
 
-        /// <summary>
-        /// Initializes the singleton application object.  This is the first line of authored code
-        /// executed, and as such is the logical equivalent of main() or WinMain().
-        /// </summary>
         public App()
         {
+            instanceMutex = new Mutex(true, MutexName, out bool isNewInstance);
+            if (!isNewInstance)
+            {
+                ShowMessageBox(
+                    "Panosse est déjà active dans la barre des tâches.\n\n" +
+                    "Astuce : double-cliquez sur l'icône dans la zone de notification pour afficher la fenêtre.",
+                    "Panosse - Déjà active");
+                Environment.Exit(0);
+            }
+
             Services = ConfigureServices();
             InitializeComponent();
         }
@@ -166,10 +176,24 @@ namespace Panosse.WinUI
             resourcesDisposed = true;
             globalHotkeyService?.Dispose();
             systemTrayService?.Dispose();
+            if (instanceMutex is not null)
+            {
+                instanceMutex.ReleaseMutex();
+                instanceMutex.Dispose();
+                instanceMutex = null;
+            }
             if (Services is IDisposable disposableProvider)
             {
                 disposableProvider.Dispose();
             }
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
+
+        private static void ShowMessageBox(string text, string caption)
+        {
+            _ = MessageBox(IntPtr.Zero, text, caption, 0x40);
         }
     }
 }

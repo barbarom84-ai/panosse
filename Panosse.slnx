@@ -3,5 +3,4 @@
     <Project Path="src/Panosse.Core/Panosse.Core.csproj" />
     <Project Path="src/Panosse.WinUI/Panosse.WinUI.csproj" />
   </Folder>
-  <Project Path="Panosse.csproj" />
 </Solution>

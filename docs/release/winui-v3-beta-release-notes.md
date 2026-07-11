@@ -5,7 +5,7 @@ Statut: Beta
 
 ## Points forts
 
-- Nouvelle base WinUI 3 introduite en parallele de l'application WPF existante.
+- Application WinUI 3 (v3) avec architecture services/orchestrateurs.
 - Architecture refactoree autour de services et orchestrateurs reutilisables.
 - Parcours nettoyage moderne avec progression en temps reel.
 - Update pipeline renforce (verification, preparation, installation).
@@ -60,8 +60,8 @@ Statut: Beta
 
 ## Migration et compatibilite
 
-- Migration progressive: WPF reste disponible pendant la montee en charge WinUI.
-- Core partage pour limiter la duplication de logique metier.
+- Codebase unifiee WinUI 3 + `Panosse.Core` (plus de projet WPF).
+- Services metier centralises dans `src/Panosse.Core/Services`.
 
 ## Known limitations (beta)
 

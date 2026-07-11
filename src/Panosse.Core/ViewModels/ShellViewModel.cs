@@ -8,9 +8,9 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Input;
 using System.Reflection;
 using System.IO;
+using System.Windows.Input;
 using Panosse.Core.Commands;
 using Panosse.Services;
 

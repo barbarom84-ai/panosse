@@ -7,9 +7,7 @@
 #define MyAppPublisher "Marco Barbaro"
 #define MyAppURL "https://github.com/barbarom84-ai/panosse"
 #define MyAppExeName "Panosse.exe"
-#define MyAppIconFile "assets\panosse.ico"
-#define MyAppIconClean "assets\panosse_propre.ico"
-#define MyAppIconDirty "assets\panosse_sale.ico"
+#define MyAppIconFile "src\Panosse.WinUI\Assets\panosse.ico"
 
 [Setup]
 ; Informations de base de l'application
@@ -72,29 +70,16 @@ Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescrip
 Name: "startupicon"; Description: "{cm:AutoStartProgram,{#MyAppName}}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-; Fichier principal et toutes les DLLs natives (depuis le dossier publish)
-; Aligne avec _Scripts/creer-installateur.ps1 qui publie dans .\publish
 Source: "publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
-
-; Fichiers icônes pour le System Tray (v2.1.2)
-; Copiés depuis le dossier assets source (pas depuis publish car embarqués)
-Source: "{#MyAppIconClean}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#MyAppIconDirty}"; DestDir: "{app}"; Flags: ignoreversion
-
-; Fichiers de documentation (optionnels)
+Source: "{#MyAppIconFile}"; DestDir: "{app}"; DestName: "panosse.ico"; Flags: ignoreversion
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion isreadme; DestName: "LisezMoi.txt"
 
 [Icons]
-; Icône dans le menu Démarrer (avec icône propre)
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\panosse_propre.ico"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\panosse.ico"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-
-; Icône sur le bureau (avec icône propre)
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\panosse_propre.ico"; Tasks: desktopicon
-
-; Icône dans la barre de lancement rapide
-Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\panosse_propre.ico"; Tasks: quicklaunchicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\panosse.ico"; Tasks: desktopicon
+Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\panosse.ico"; Tasks: quicklaunchicon
 
 [Registry]
 ; Lancer Panosse au démarrage de Windows (pour que Ctrl+Alt+P soit toujours actif)
@@ -144,13 +129,9 @@ begin
   if CurStep = ssPostInstall then
   begin
     // Afficher un message informatif après l'installation
-    MsgBox('Panosse v2.1.2 a été installé avec succès !' + #13#10 + #13#10 + 
-           'CORRECTIFS v2.1.2 :' + #13#10 +
-           '  - Correction d''un crash lors des clics dans la barre de menu' + #13#10 +
-           '  - Déplacement de fenêtre plus robuste sur les éléments texte' + #13#10 +
-           '  - Stabilisation générale des interactions menu/top bar' + #13#10 + #13#10 +
-           'TIP : Si vous avez coché "Lancer au démarrage", le raccourci' + #13#10 +
-           'Ctrl+Alt+P sera toujours disponible en arrière-plan !', 
+    MsgBox('Panosse a ete installe avec succes !' + #13#10 + #13#10 +
+           'Raccourci global : Ctrl+Alt+P' + #13#10 +
+           'Icone disponible dans la zone de notification.',
            mbInformation, MB_OK);
   end;
 end;

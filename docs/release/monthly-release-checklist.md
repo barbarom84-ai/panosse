@@ -4,7 +4,7 @@ Use this checklist for every monthly roadmap release.
 
 ## 1) Scope and Version
 - [ ] Feature scope is frozen for the month.
-- [ ] Version is updated (`Panosse.csproj`, release notes, installer metadata).
+- [ ] Version is updated (`src/Panosse.WinUI/Panosse.WinUI.csproj`, release notes, installer metadata).
 - [ ] Changelog entry drafted with user-facing summary and known limitations.
 
 ## 2) Build Validation
