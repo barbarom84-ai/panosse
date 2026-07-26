@@ -9,6 +9,10 @@ public interface ICleanupService
     long CleanTemporaryFiles();
     long CleanChromeCache();
     long CleanEdgeCache();
+    long CleanFirefoxCache();
+    long CleanOperaCache();
+    long CleanBraveCache();
+    long CleanVivaldiCache();
     void CleanRegistry();
     long CleanOldDownloads(IEnumerable<string>? exclusionPatterns = null);
     long CleanWindowsLogs();

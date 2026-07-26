@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
@@ -31,20 +32,86 @@ namespace Panosse.WinUI.Views
             this.Loaded += MainPage_Loaded;
             this.KeyDown += MainPage_KeyDown;
             this.Unloaded += MainPage_Unloaded;
+            ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         }
 
         private async void MainPage_Loaded(object sender, RoutedEventArgs e)
         {
             DisplayLayoutHelper.ApplyWindowSize(App.MainWindow);
+            NavList.SelectedIndex = 0;
+            UpdateMopAnimation();
             await CheckBrowsersAsync();
         }
 
         private void MainPage_Unloaded(object sender, RoutedEventArgs e)
         {
+            ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
             browserCloseCts?.Cancel();
             browserCloseCts?.Dispose();
             browserCloseCts = null;
         }
+
+        private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ShellViewModel.IsBusy))
+            {
+                UpdateMopAnimation();
+            }
+        }
+
+        // Lance/stoppe le balancement de la serpillère selon l'état de nettoyage.
+        private void UpdateMopAnimation()
+        {
+            if (ViewModel.IsBusy)
+            {
+                MopCleaningStoryboard.Begin();
+            }
+            else
+            {
+                MopCleaningStoryboard.Stop();
+                if (MopTransform is not null)
+                {
+                    MopTransform.Rotation = 0;
+                    MopTransform.TranslateY = 0;
+                }
+            }
+        }
+
+        // ==================== Navigation sidebar ====================
+
+        private void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ShowPanel(NavList.SelectedIndex);
+        }
+
+        private void ShowPanel(int index)
+        {
+            if (HomePanel is null)
+            {
+                return;
+            }
+
+            HomePanel.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
+            SettingsPanel.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
+            HistoryPanel.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
+            AboutPanel.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
+
+            if (index == 1 || index == 2)
+            {
+                ViewModel.RefreshHistoryCommand.Execute(null);
+            }
+        }
+
+        private void MainPage_KeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == Windows.System.VirtualKey.Escape && NavList.SelectedIndex != 0)
+            {
+                NavList.SelectedIndex = 0;
+                e.Handled = true;
+            }
+        }
+
+        // ==================== Navigateurs ====================
 
         private async Task CheckBrowsersAsync()
         {
@@ -139,37 +206,7 @@ namespace Panosse.WinUI.Views
             Application.Current.Exit();
         }
 
-        private void MenuSettings_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.RefreshHistoryCommand.Execute(null);
-            ShowOnlyOverlay(OverlaySettings);
-        }
-
-        private void CloseSettings_Click(object sender, RoutedEventArgs e)
-        {
-            OverlaySettings.Visibility = Visibility.Collapsed;
-        }
-
-        private void MenuHistory_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.RefreshHistoryCommand.Execute(null);
-            ShowOnlyOverlay(OverlayHistory);
-        }
-
-        private void CloseHistory_Click(object sender, RoutedEventArgs e)
-        {
-            OverlayHistory.Visibility = Visibility.Collapsed;
-        }
-
-        private void MenuAbout_Click(object sender, RoutedEventArgs e)
-        {
-            ShowOnlyOverlay(OverlayAbout);
-        }
-
-        private async void MenuCheckUpdates_Click(object sender, RoutedEventArgs e)
-        {
-            await CheckForUpdatesAsync(showDialog: sender is not Button);
-        }
+        // ==================== Mises à jour ====================
 
         private async Task CheckForUpdatesAsync(bool showDialog)
         {
@@ -283,50 +320,6 @@ namespace Panosse.WinUI.Views
             {
                 ViewModel.StatusText = "Impossible d'ouvrir GitHub.";
             }
-        }
-
-        private void CloseAbout_Click(object sender, RoutedEventArgs e)
-        {
-            OverlayAbout.Visibility = Visibility.Collapsed;
-        }
-
-        private void MainPage_KeyDown(object sender, KeyRoutedEventArgs e)
-        {
-            if (e.Key == Windows.System.VirtualKey.Escape && CloseAnyOverlay())
-            {
-                e.Handled = true;
-            }
-        }
-
-        private void ShowOnlyOverlay(UIElement targetOverlay)
-        {
-            OverlaySettings.Visibility = Visibility.Collapsed;
-            OverlayHistory.Visibility = Visibility.Collapsed;
-            OverlayAbout.Visibility = Visibility.Collapsed;
-            targetOverlay.Visibility = Visibility.Visible;
-        }
-
-        private bool CloseAnyOverlay()
-        {
-            if (OverlaySettings.Visibility == Visibility.Visible)
-            {
-                OverlaySettings.Visibility = Visibility.Collapsed;
-                return true;
-            }
-
-            if (OverlayHistory.Visibility == Visibility.Visible)
-            {
-                OverlayHistory.Visibility = Visibility.Collapsed;
-                return true;
-            }
-
-            if (OverlayAbout.Visibility == Visibility.Visible)
-            {
-                OverlayAbout.Visibility = Visibility.Collapsed;
-                return true;
-            }
-
-            return false;
         }
     }
 }

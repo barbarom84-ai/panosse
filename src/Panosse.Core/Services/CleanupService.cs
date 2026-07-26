@@ -38,22 +38,115 @@ public sealed class CleanupService : ICleanupService
 
     public long CleanChromeCache()
     {
-        long size = 0;
         string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        size += CleanDirectory(Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Cache"));
-        size += CleanDirectory(Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Cache\Cache_Data"));
-        size += CleanDirectory(Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Code Cache"));
-        return size;
+        return CleanChromiumProfiles(Path.Combine(localAppData, @"Google\Chrome\User Data"));
     }
 
     public long CleanEdgeCache()
     {
-        long size = 0;
         string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        size += CleanDirectory(Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Cache"));
-        size += CleanDirectory(Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Cache\Cache_Data"));
-        size += CleanDirectory(Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Code Cache"));
+        return CleanChromiumProfiles(Path.Combine(localAppData, @"Microsoft\Edge\User Data"));
+    }
+
+    public long CleanFirefoxCache()
+    {
+        long size = 0;
+        string roamingAppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+        size += CleanFirefoxProfiles(Path.Combine(roamingAppData, @"Mozilla\Firefox\Profiles"));
+        size += CleanFirefoxProfiles(Path.Combine(localAppData, @"Mozilla\Firefox\Profiles"));
         return size;
+    }
+
+    public long CleanOperaCache()
+    {
+        long size = 0;
+        string roamingAppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+
+        size += CleanOperaProfile(Path.Combine(roamingAppData, @"Opera Software\Opera Stable"));
+        size += CleanOperaProfile(Path.Combine(roamingAppData, @"Opera Software\Opera GX Stable"));
+        return size;
+    }
+
+    public long CleanBraveCache()
+    {
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return CleanChromiumProfiles(Path.Combine(localAppData, @"BraveSoftware\Brave-Browser\User Data"));
+    }
+
+    public long CleanVivaldiCache()
+    {
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return CleanChromiumProfiles(Path.Combine(localAppData, @"Vivaldi\User Data"));
+    }
+
+    private long CleanChromiumProfiles(string userDataPath)
+    {
+        long size = 0;
+        foreach (string profilePath in GetProfileDirectories(userDataPath))
+        {
+            size += CleanDirectory(Path.Combine(profilePath, "Cache"));
+            size += CleanDirectory(Path.Combine(profilePath, "Code Cache"));
+        }
+
+        return size;
+    }
+
+    private long CleanFirefoxProfiles(string profilesPath)
+    {
+        long size = 0;
+        if (!Directory.Exists(profilesPath))
+        {
+            return size;
+        }
+
+        try
+        {
+            foreach (string profilePath in Directory.EnumerateDirectories(profilesPath))
+            {
+                size += CleanDirectory(Path.Combine(profilePath, "cache2"));
+            }
+        }
+        catch
+        {
+            // Ignorer les profils absents ou inaccessibles.
+        }
+
+        return size;
+    }
+
+    private long CleanOperaProfile(string profilePath)
+    {
+        long size = 0;
+        size += CleanDirectory(Path.Combine(profilePath, "Cache"));
+        size += CleanDirectory(Path.Combine(profilePath, "Code Cache"));
+        size += CleanChromiumProfiles(profilePath);
+        return size;
+    }
+
+    private static IEnumerable<string> GetProfileDirectories(string userDataPath)
+    {
+        if (!Directory.Exists(userDataPath))
+        {
+            return [];
+        }
+
+        try
+        {
+            return Directory.EnumerateDirectories(userDataPath)
+                .Where(path =>
+                {
+                    string name = Path.GetFileName(path);
+                    return name.Equals("Default", StringComparison.OrdinalIgnoreCase) ||
+                           name.StartsWith("Profile ", StringComparison.OrdinalIgnoreCase);
+                })
+                .ToArray();
+        }
+        catch
+        {
+            return [];
+        }
     }
 
     public void CleanRegistry()

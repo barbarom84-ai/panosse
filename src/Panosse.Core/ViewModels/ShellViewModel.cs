@@ -54,6 +54,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
     private bool enableScheduledCleanup;
     private int scheduledCleanupIntervalHours = 24;
     private string schedulerStatusText = "Planification inactive.";
+    private const int MaxVisibleTaskMessages = 6;
+    private bool isSuccessStatus;
     private System.Timers.Timer? scheduledCleanupTimer;
     private readonly SemaphoreSlim scheduledCleanupLock = new(1, 1);
     private bool disposed;
@@ -64,6 +66,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
     private readonly IUpdateService updateService;
     private readonly IUpdateOrchestrator updateOrchestrator;
     private const string GithubRepo = "barbarom84-ai/panosse";
+    private static readonly TimeSpan MinimumCleanupDuration = TimeSpan.FromSeconds(5);
 
     public ShellViewModel(
         ICleanupOrchestrator cleanupOrchestrator,
@@ -160,6 +163,12 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
     public bool IsProgressVisible => IsBusy || ProgressValue > 0;
 
     public bool HasTaskMessages => TaskMessages.Count > 0;
+
+    public bool IsSuccessStatus
+    {
+        get => isSuccessStatus;
+        private set => SetField(ref isSuccessStatus, value);
+    }
 
     public bool CheckUpdatesOnStartup
     {
@@ -394,6 +403,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
     private async Task ExecuteCleanupAsync()
     {
         IsBusy = true;
+        Stopwatch cleanupStopwatch = Stopwatch.StartNew();
+        IsSuccessStatus = false;
         ButtonText = PreviewModeEnabled ? "Previsualisation..." : "Nettoyage...";
         StatusText = "Preparation...";
         ProgressValue = 0;
@@ -414,32 +425,61 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
                 if (update.IsCompleted)
                 {
                     totalFreedBytes += update.StepFreedBytes;
+                    AddTaskMessage(update.Message);
                 }
 
                 double ratio = update.TotalSteps > 0
                     ? (double)update.StepIndex / update.TotalSteps
                     : 0;
                 ProgressValue = Math.Round(ratio * 100, 2);
-                TaskMessages.Add(update.Message);
             }
+
+            await EnsureMinimumCleanupDurationAsync(cleanupStopwatch);
 
             double totalMb = Math.Round(totalFreedBytes / 1024.0 / 1024.0, 2);
             LastRunSummary = PreviewModeEnabled
                 ? $"Previsualisation terminee: {totalMb} Mo estimes."
                 : $"Nettoyage termine: {totalMb} Mo liberes.";
             StatusText = LastRunSummary;
+            IsSuccessStatus = true;
             RefreshHistory();
         }
         catch (Exception ex)
         {
+            await EnsureMinimumCleanupDurationAsync(cleanupStopwatch);
+
+            IsSuccessStatus = false;
             StatusText = $"Erreur: {ex.Message}";
-            TaskMessages.Add(StatusText);
+            AddTaskMessage(StatusText);
             loggerService.LogError("winui-cleanup", "Cleanup execution failed.", ex);
         }
         finally
         {
             IsBusy = false;
             ButtonText = "Passer la panosse";
+        }
+    }
+
+    private static async Task EnsureMinimumCleanupDurationAsync(Stopwatch cleanupStopwatch)
+    {
+        TimeSpan remainingDuration = MinimumCleanupDuration - cleanupStopwatch.Elapsed;
+        if (remainingDuration > TimeSpan.Zero)
+        {
+            await Task.Delay(remainingDuration);
+        }
+    }
+
+    private void AddTaskMessage(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        TaskMessages.Add(message);
+        while (TaskMessages.Count > MaxVisibleTaskMessages)
+        {
+            TaskMessages.RemoveAt(0);
         }
     }
 

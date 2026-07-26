@@ -56,9 +56,11 @@ namespace Panosse.WinUI
             var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
             var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
             var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
+
+            ApplyWindowIcon(appWindow);
             
             // Taille initiale ; affinée après le premier rendu (DPI + zone de travail).
-            appWindow.Resize(new Windows.Graphics.SizeInt32 { Width = 540, Height = 880 });
+            appWindow.Resize(new Windows.Graphics.SizeInt32 { Width = 720, Height = 680 });
             
             if (appWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
             {
@@ -66,8 +68,6 @@ namespace Panosse.WinUI
                 presenter.IsMaximizable = false;
             }
             
-            // On retire ExtendsContentIntoTitleBar pour que la barre de titre standard s'affiche
-            // et ne cache pas le menu en haut.
             window.ExtendsContentIntoTitleBar = false;
 
             if (window.Content is not Frame rootFrame)
@@ -81,6 +81,31 @@ namespace Panosse.WinUI
             window.Activate();
 
             InitializeSystemTrayAndHotkey();
+        }
+
+        /// <summary>
+        /// Affiche l'icône Panosse dans la barre de titre (app unpackagée).
+        /// Cherche Assets\panosse.ico sous AppContext.BaseDirectory (Debug + single-file extrait).
+        /// </summary>
+        private static void ApplyWindowIcon(Microsoft.UI.Windowing.AppWindow appWindow)
+        {
+            try
+            {
+                string iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "panosse.ico");
+                if (!File.Exists(iconPath))
+                {
+                    iconPath = Path.Combine(AppContext.BaseDirectory, "panosse.ico");
+                }
+
+                if (File.Exists(iconPath))
+                {
+                    appWindow.SetIcon(iconPath);
+                }
+            }
+            catch
+            {
+                // Icône décorative : ne pas bloquer le démarrage.
+            }
         }
 
         private static IServiceProvider ConfigureServices()

@@ -20,65 +20,96 @@
         <SolidColorBrush x:Key="AppTextColor" Color="#424242" />
         <SolidColorBrush x:Key="AppSubtextColor" Color="#757575" />
         <SolidColorBrush x:Key="AppBorderColor" Color="#E0E0E0" />
-        <SolidColorBrush x:Key="AppBackgroundColor" Color="#F5F5F5" />
+        <SolidColorBrush x:Key="AppBackgroundColor" Color="#F3F6FB" />
         <SolidColorBrush x:Key="AppCardColor" Color="#FFFFFF" />
         <SolidColorBrush x:Key="AppWarningColor" Color="#FFA000" />
         <SolidColorBrush x:Key="AppSuccessColor" Color="#4CAF50" />
         <SolidColorBrush x:Key="AppSuccessHoverColor" Color="#66BB6A" />
         <SolidColorBrush x:Key="AppSuccessPressedColor" Color="#388E3C" />
-        <SolidColorBrush x:Key="AppMutedTextColor" Color="#9E9E9E" />
+        <SolidColorBrush x:Key="AppMutedTextColor" Color="#616161" />
+        <SolidColorBrush x:Key="AppSuccessStatusColor" Color="#2E7D32" />
+        <SolidColorBrush x:Key="AppSidebarColor" Color="#EAF1FB" />
+        <SolidColorBrush x:Key="AppSidebarSelectedColor" Color="#D6E6FB" />
 
-        <!-- Style pour le bouton circulaire bleu -->
+        <!-- Animation serpillère : lancée pendant le nettoyage (léger balancement + petit rebond) -->
+        <Storyboard x:Name="MopCleaningStoryboard" RepeatBehavior="Forever" AutoReverse="True">
+            <DoubleAnimation Storyboard.TargetName="MopTransform"
+                             Storyboard.TargetProperty="Rotation"
+                             From="-14" To="14" Duration="0:0:0.55"
+                             EnableDependentAnimation="True">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="MopTransform"
+                             Storyboard.TargetProperty="TranslateY"
+                             From="0" To="-6" Duration="0:0:0.55"
+                             EnableDependentAnimation="True">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+
+        <!-- Style carte Fluent -->
+        <Style x:Key="CardBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource AppCardColor}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="24,20" />
+        </Style>
+
+        <!-- CTA circulaire de la carte Boost : template custom sans chrome carré.
+             Le contenu (Ellipse+ImageBrush) est rogné dans un disque parfait :
+             aucun coin carré/arrondi du PNG ne dépasse, et aucun fond carré du bouton. -->
         <Style x:Key="CircleButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource AppPrimaryColor}"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Width" Value="88" />
+            <Setter Property="Height" Value="88" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="UseSystemFocusVisuals" Value="False" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Grid>
+                        <Grid x:Name="RootGrid" Background="Transparent">
+                            <!-- Le contenu est lui-même une Ellipse : silhouette 100% ronde -->
+                            <ContentPresenter x:Name="ContentPresenter"
+                                              Content="{TemplateBinding Content}"
+                                              Padding="0"
+                                              HorizontalContentAlignment="Stretch"
+                                              VerticalContentAlignment="Stretch" />
                             <VisualStateManager.VisualStateGroups>
                                 <VisualStateGroup x:Name="CommonStates">
                                     <VisualState x:Name="Normal" />
                                     <VisualState x:Name="PointerOver">
                                         <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ellipse" Storyboard.TargetProperty="Fill">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource AppPrimaryHoverColor}" />
-                                            </ObjectAnimationUsingKeyFrames>
+                                            <DoubleAnimation Storyboard.TargetName="RootGrid"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0.9" Duration="0" />
                                         </Storyboard>
                                     </VisualState>
                                     <VisualState x:Name="Pressed">
                                         <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ellipse" Storyboard.TargetProperty="Fill">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource AppPrimaryPressedColor}" />
-                                            </ObjectAnimationUsingKeyFrames>
-                                            <DoubleAnimation Storyboard.TargetName="ContentPresenterScale" Storyboard.TargetProperty="ScaleX" To="0.95" Duration="0:0:0.1" />
-                                            <DoubleAnimation Storyboard.TargetName="ContentPresenterScale" Storyboard.TargetProperty="ScaleY" To="0.95" Duration="0:0:0.1" />
+                                            <DoubleAnimation Storyboard.TargetName="RootGrid"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0.75" Duration="0" />
                                         </Storyboard>
                                     </VisualState>
                                     <VisualState x:Name="Disabled">
                                         <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ellipse" Storyboard.TargetProperty="Fill">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="#BDBDBD" />
-                                            </ObjectAnimationUsingKeyFrames>
+                                            <DoubleAnimation Storyboard.TargetName="RootGrid"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0.5" Duration="0" />
                                         </Storyboard>
                                     </VisualState>
                                 </VisualStateGroup>
                             </VisualStateManager.VisualStateGroups>
-                            <Ellipse Fill="#662196F3"
-                                     HorizontalAlignment="Stretch"
-                                     VerticalAlignment="Stretch"
-                                     Margin="0,8,0,-4"
-                                     Opacity="0.45" />
-                            <Ellipse x:Name="ellipse" Fill="{TemplateBinding Background}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
-                            <ContentPresenter x:Name="ContentPresenter" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
-                                <ContentPresenter.RenderTransform>
-                                    <ScaleTransform x:Name="ContentPresenterScale" ScaleX="1" ScaleY="1" />
-                                </ContentPresenter.RenderTransform>
-                            </ContentPresenter>
                         </Grid>
                     </ControlTemplate>
                 </Setter.Value>
@@ -117,421 +148,425 @@
             <Setter Property="FontSize" Value="11"/>
         </Style>
 
+        <!-- Style d'item de navigation (sidebar) -->
+        <Style x:Key="NavItemStyle" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="Margin" Value="8,2" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Foreground" Value="{StaticResource AppTextColor}" />
+        </Style>
+
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <converters:TaskMessageBrushConverter x:Key="TaskMessageBrushConverter" />
     </Page.Resources>
 
-    <Grid>
-        <Grid.Background>
-            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                <GradientStop Color="#F5F5F5" Offset="0" />
-                <GradientStop Color="#FFFFFF" Offset="1" />
-            </LinearGradientBrush>
-        </Grid.Background>
+    <Grid Background="{StaticResource AppBackgroundColor}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="210" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+        <!-- Sidebar de navigation -->
+        <Grid Grid.Column="0" Background="{StaticResource AppSidebarColor}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-        <!-- Barre de menu -->
-        <MenuBar Grid.Row="0" Background="{StaticResource AppCardColor}" BorderBrush="{StaticResource AppBorderColor}" BorderThickness="0,0,0,1">
-            <MenuBar.Resources>
-                <!-- Forcer la couleur du texte des menus à être foncée -->
-                <SolidColorBrush x:Key="MenuBarItemForeground" Color="#424242" />
-                <SolidColorBrush x:Key="MenuFlyoutItemForeground" Color="#424242" />
-            </MenuBar.Resources>
-            <MenuBarItem Title="📁 Fichier">
-                <MenuFlyoutItem Text="❌ Quitter définitivement" Click="MenuQuit_Click" />
-            </MenuBarItem>
-            
-            <MenuBarItem Title="🔧 Outils">
-                <MenuFlyoutItem Text="⚙️ Paramètres" Click="MenuSettings_Click" />
-                <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="🕘 Historique des opérations" Command="{x:Bind ViewModel.RefreshHistoryCommand}" Click="MenuHistory_Click" />
-                <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="🔍 Vérifier les mises à jour" Click="MenuCheckUpdates_Click" />
-                <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="📄 Ouvrir les logs" Command="{x:Bind ViewModel.OpenLogsCommand}" />
-            </MenuBarItem>
-            
-            <MenuBarItem Title="❓ Aide">
-                <MenuFlyoutItem Text="ℹ️ À propos de Panosse" Click="MenuAbout_Click" />
-            </MenuBarItem>
-        </MenuBar>
-
-        <!-- Titre et Zone centrale -->
-        <Grid Grid.Row="1" Margin="24,0">
-            <StackPanel HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Spacing="0">
-                <TextBlock Text="Panosse" 
-                           FontSize="36" 
-                           FontWeight="Light" 
-                           Foreground="{StaticResource AppTextColor}" 
-                           HorizontalAlignment="Center" 
-                           Margin="0,0,0,24"/>
-
-                <Button x:Name="BtnNettoyer" 
-                        Style="{StaticResource CircleButtonStyle}" 
-                        Width="150" 
-                        Height="150"
-                        Command="{x:Bind ViewModel.RunCleanupCommand}">
-                    <Button.Content>
-                        <Image Source="ms-appx:///Assets/panosse.png" 
-                               Width="80" 
-                               Height="80"
-                               Stretch="Uniform"/>
-                    </Button.Content>
-                </Button>
-
-                <TextBlock Text="{x:Bind ViewModel.ButtonText, Mode=OneWay}" 
-                           FontSize="18" 
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="16,20,16,16">
+                <Image Source="ms-appx:///Assets/panosse.png" Width="32" Height="32" />
+                <TextBlock Text="Panosse"
+                           FontSize="20"
                            FontWeight="SemiBold"
-                           Foreground="{StaticResource AppTextColor}" 
-                           HorizontalAlignment="Center"
-                           Margin="0,20,0,0" />
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource AppTextColor}" />
             </StackPanel>
+
+            <ListView x:Name="NavList"
+                      Grid.Row="1"
+                      SelectionMode="Single"
+                      SelectionChanged="NavList_SelectionChanged"
+                      ItemContainerStyle="{StaticResource NavItemStyle}">
+                <ListViewItem>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" />
+                        <TextBlock Text="Accueil" FontSize="14" VerticalAlignment="Center" />
+                    </StackPanel>
+                </ListViewItem>
+                <ListViewItem>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" />
+                        <TextBlock Text="Paramètres" FontSize="14" VerticalAlignment="Center" />
+                    </StackPanel>
+                </ListViewItem>
+                <ListViewItem>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" />
+                        <TextBlock Text="Historique" FontSize="14" VerticalAlignment="Center" />
+                    </StackPanel>
+                </ListViewItem>
+                <ListViewItem>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" />
+                        <TextBlock Text="À propos" FontSize="14" VerticalAlignment="Center" />
+                    </StackPanel>
+                </ListViewItem>
+            </ListView>
+
+            <Button Grid.Row="2"
+                    Click="MenuQuit_Click"
+                    Style="{StaticResource SecondaryButtonStyle}"
+                    HorizontalAlignment="Stretch"
+                    Margin="16,8,16,20">
+                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                    <TextBlock Text="&#xE7E8;" FontFamily="Segoe MDL2 Assets" FontSize="15" VerticalAlignment="Center" />
+                    <TextBlock Text="Quitter" FontSize="14" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
         </Grid>
 
-        <!-- Zone de statut en bas -->
-        <StackPanel Grid.Row="2" VerticalAlignment="Bottom" Margin="32,0,32,28" Spacing="10">
-            <!-- Barre de progression -->
-            <ProgressBar x:Name="CleanupProgressBar"
-                         Minimum="0" 
-                         Maximum="100" 
-                         Value="{x:Bind ViewModel.ProgressValue, Mode=OneWay}" 
-                         Height="6"
-                         Foreground="{StaticResource AppPrimaryColor}"
-                         Background="{StaticResource AppBorderColor}"
-                         CornerRadius="3"
-                         x:Load="{x:Bind ViewModel.IsProgressVisible, Mode=OneWay}"/>
+        <!-- Zone de contenu -->
+        <Grid Grid.Column="1" Margin="0">
 
-            <!-- Liste des elements nettoyes (visible pendant le nettoyage) -->
-            <ItemsControl x:Name="TaskMessagesList"
-                          x:Load="{x:Bind ViewModel.HasTaskMessages, Mode=OneWay}"
-                          ItemsSource="{x:Bind ViewModel.TaskMessages, Mode=OneWay}"
-                          HorizontalAlignment="Stretch">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="sys:String">
-                        <TextBlock Text="{x:Bind}"
-                                   Foreground="{StaticResource AppMutedTextColor}"
-                                   FontSize="12"
-                                   TextWrapping="WrapWholeWords"
-                                   Opacity="0.9"
-                                   Margin="0,2,0,2" />
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <!-- ============ ACCUEIL ============ -->
+            <ScrollViewer x:Name="HomePanel" VerticalScrollBarVisibility="Auto" Padding="24,20">
+                <StackPanel Spacing="16" MaxWidth="620" HorizontalAlignment="Stretch">
 
-            <!-- Message de statut -->
-            <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" 
-                       FontSize="14" 
-                       Foreground="{StaticResource AppSubtextColor}" 
-                       TextAlignment="Center" 
-                       TextWrapping="WrapWholeWords"
-                       HorizontalAlignment="Stretch"/>
-                       
-            <!-- Avertissement Navigateurs -->
-            <HyperlinkButton x:Name="BrowserWarningLink"
-                             Visibility="Collapsed"
-                             Click="BrowserWarningLink_Click"
-                             HorizontalAlignment="Center"
-                             HorizontalContentAlignment="Center"
-                             MaxWidth="520">
-                <TextBlock Text="⚠️ Veuillez fermer Edge pour un nettoyage complet (cliquez ici pour fermer automatiquement)"
-                           Foreground="{StaticResource AppWarningColor}"
-                           FontSize="13"
-                           TextWrapping="WrapWholeWords"
-                           TextAlignment="Center"
-                           TextDecorations="Underline" />
-            </HyperlinkButton>
-        </StackPanel>
+                    <!-- Carte Boost (dominante) -->
+                    <Border Style="{StaticResource CardBorderStyle}" Padding="28,26">
+                        <StackPanel Spacing="18" HorizontalAlignment="Stretch">
+                            <StackPanel Spacing="12" HorizontalAlignment="Center">
+                                <TextBlock Text="Passer la panosse"
+                                           FontSize="24"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource AppTextColor}"
+                                           HorizontalAlignment="Center"
+                                           TextAlignment="Center" />
+                                <TextBlock Text="Nettoyez les fichiers temporaires et libérez de l'espace en un clic."
+                                           FontSize="13"
+                                           Foreground="{StaticResource AppSubtextColor}"
+                                           TextWrapping="WrapWholeWords"
+                                           TextAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           MaxWidth="360" />
+                                <Button x:Name="BtnNettoyer"
+                                        Style="{StaticResource CircleButtonStyle}"
+                                        Command="{x:Bind ViewModel.RunCleanupCommand}"
+                                        AutomationProperties.Name="{x:Bind ViewModel.ButtonText, Mode=OneWay}"
+                                        ToolTipService.ToolTip="{x:Bind ViewModel.ButtonText, Mode=OneWay}"
+                                        HorizontalAlignment="Center"
+                                        Margin="0,6,0,0">
+                                    <!-- Ellipse + ImageBrush : cercle parfait, PNG (coins transparents) remplit le disque -->
+                                    <Ellipse x:Name="MopIcon"
+                                             Width="88"
+                                             Height="88"
+                                             RenderTransformOrigin="0.5,0.9">
+                                        <Ellipse.Fill>
+                                            <ImageBrush ImageSource="ms-appx:///Assets/panosse.png"
+                                                        Stretch="UniformToFill"
+                                                        AlignmentX="Center"
+                                                        AlignmentY="Center" />
+                                        </Ellipse.Fill>
+                                        <Ellipse.RenderTransform>
+                                            <CompositeTransform x:Name="MopTransform" />
+                                        </Ellipse.RenderTransform>
+                                    </Ellipse>
+                                </Button>
+                            </StackPanel>
 
-        <!-- Overlay Paramètres -->
-        <Grid x:Name="OverlaySettings" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed">
-            <Border Background="{StaticResource AppCardColor}"
-                    BorderBrush="{StaticResource AppBorderColor}"
-                    BorderThickness="1"
-                    CornerRadius="15"
-                    Margin="36"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch"
-                    Padding="28,24">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                            <!-- Avertissement Navigateurs -->
+                            <HyperlinkButton x:Name="BrowserWarningLink"
+                                             Visibility="Collapsed"
+                                             Click="BrowserWarningLink_Click"
+                                             HorizontalAlignment="Center"
+                                             HorizontalContentAlignment="Center"
+                                             MaxWidth="520">
+                                <TextBlock Text="⚠️ Veuillez fermer Edge pour un nettoyage complet (cliquez ici pour fermer automatiquement)"
+                                           Foreground="{StaticResource AppWarningColor}"
+                                           FontSize="13"
+                                           TextWrapping="WrapWholeWords"
+                                           TextAlignment="Center"
+                                           TextDecorations="Underline" />
+                            </HyperlinkButton>
+                        </StackPanel>
+                    </Border>
 
-                    <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,12">
-                        <Button Content="← Retour"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Click="CloseSettings_Click"
-                                HorizontalAlignment="Left" />
-                        <TextBlock Text="⚙️ Paramètres"
-                                   FontSize="24"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource AppPrimaryColor}"
-                                   HorizontalAlignment="Center" />
-                    </StackPanel>
+                    <!-- Carte activité (progression + étapes) -->
+                    <Border x:Name="ActivityCard"
+                            Style="{StaticResource CardBorderStyle}"
+                            x:Load="{x:Bind ViewModel.IsProgressVisible, Mode=OneWay}">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Activité"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource AppTextColor}" />
+                            <ProgressBar x:Name="CleanupProgressBar"
+                                         Minimum="0"
+                                         Maximum="100"
+                                         Value="{x:Bind ViewModel.ProgressValue, Mode=OneWay}"
+                                         Height="6"
+                                         Foreground="{StaticResource AppPrimaryColor}"
+                                         Background="{StaticResource AppBorderColor}"
+                                         CornerRadius="3" />
+                            <ScrollViewer x:Name="TaskMessagesScroller"
+                                          MaxHeight="150"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl x:Name="TaskMessagesList"
+                                              ItemsSource="{x:Bind ViewModel.TaskMessages, Mode=OneWay}"
+                                              HorizontalAlignment="Stretch">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="sys:String">
+                                            <TextBlock Text="{x:Bind}"
+                                                       Foreground="{Binding Converter={StaticResource TaskMessageBrushConverter}}"
+                                                       FontSize="13"
+                                                       FontWeight="SemiBold"
+                                                       TextWrapping="WrapWholeWords"
+                                                       Margin="0,3,0,3" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </StackPanel>
+                    </Border>
 
-                    <Border Grid.Row="1" Height="1" Background="{StaticResource AppBorderColor}" Margin="0,0,0,16" />
-
-                    <StackPanel Grid.Row="2" Spacing="14" VerticalAlignment="Top">
-                        <CheckBox Content="Vérifier les mises à jour au démarrage"
-                                  IsChecked="{x:Bind ViewModel.CheckUpdatesOnStartup, Mode=TwoWay}"
-                                  FontSize="14"
-                                  Foreground="{StaticResource AppTextColor}" />
-
-                        <CheckBox Content="Jouer le son de réussite"
-                                  IsChecked="{x:Bind ViewModel.PlaySuccessSound, Mode=TwoWay}"
-                                  FontSize="14"
-                                  Foreground="{StaticResource AppTextColor}" />
-
-                        <CheckBox Content="Afficher les notifications dans la barre des tâches"
-                                  IsChecked="{x:Bind ViewModel.ShowTrayNotifications, Mode=TwoWay}"
-                                  FontSize="14"
-                                  Foreground="{StaticResource AppTextColor}" />
-
-                        <CheckBox Content="Activer le mode prévisualisation (sans suppression)"
-                                  IsChecked="{x:Bind ViewModel.PreviewModeEnabled, Mode=TwoWay}"
-                                  FontSize="14"
-                                  Foreground="{StaticResource AppTextColor}" />
-
-                        <TextBlock Text="Exclusions intelligentes (mots-clés, séparés par virgules)"
-                                   FontSize="12"
-                                   Foreground="{StaticResource AppSubtextColor}" />
-                        <TextBox Foreground="{StaticResource AppTextColor}"
-                                 Background="{StaticResource AppCardColor}"
-                                 BorderBrush="{StaticResource AppBorderColor}"
-                                 BorderThickness="1"
-                                 FontSize="13"
-                                 MinHeight="32"
-                                 Padding="10,6"
-                                 Text="{x:Bind ViewModel.ExclusionPatterns, Mode=TwoWay}"
-                                 PlaceholderText="ex: setup, iso, games" />
-
-                        <CheckBox Content="Activer le nettoyage planifié"
-                                  IsChecked="{x:Bind ViewModel.EnableScheduledCleanup, Mode=TwoWay}"
-                                  FontSize="14"
-                                  Foreground="{StaticResource AppTextColor}" />
-
-                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                            <TextBlock Text="Intervalle (heures):"
-                                       FontSize="13"
+                    <!-- Carte résumé / statut -->
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Résumé"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource AppTextColor}" />
+                            <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                                       FontSize="17"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource AppSuccessStatusColor}"
+                                       TextWrapping="WrapWholeWords"
+                                       Visibility="{x:Bind ViewModel.IsSuccessStatus, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                                       FontSize="14"
                                        Foreground="{StaticResource AppSubtextColor}"
-                                       VerticalAlignment="Center" />
-                            <TextBox Width="72"
-                                     MinHeight="30"
-                                     Padding="8,4"
-                                     FontSize="13"
-                                     Foreground="{StaticResource AppTextColor}"
+                                       TextWrapping="WrapWholeWords"
+                                       Visibility="{x:Bind ViewModel.IsSuccessStatus, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Inverse}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ============ PARAMÈTRES ============ -->
+            <ScrollViewer x:Name="SettingsPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="24,20">
+                <StackPanel Spacing="16" MaxWidth="620">
+                    <TextBlock Text="Paramètres"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AppTextColor}" />
+
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel Spacing="14">
+                            <CheckBox Content="Vérifier les mises à jour au démarrage"
+                                      IsChecked="{x:Bind ViewModel.CheckUpdatesOnStartup, Mode=TwoWay}"
+                                      FontSize="14"
+                                      Foreground="{StaticResource AppTextColor}" />
+                            <CheckBox Content="Jouer le son de réussite"
+                                      IsChecked="{x:Bind ViewModel.PlaySuccessSound, Mode=TwoWay}"
+                                      FontSize="14"
+                                      Foreground="{StaticResource AppTextColor}" />
+                            <CheckBox Content="Afficher les notifications dans la barre des tâches"
+                                      IsChecked="{x:Bind ViewModel.ShowTrayNotifications, Mode=TwoWay}"
+                                      FontSize="14"
+                                      Foreground="{StaticResource AppTextColor}" />
+                            <CheckBox Content="Activer le mode prévisualisation (sans suppression)"
+                                      IsChecked="{x:Bind ViewModel.PreviewModeEnabled, Mode=TwoWay}"
+                                      FontSize="14"
+                                      Foreground="{StaticResource AppTextColor}" />
+
+                            <TextBlock Text="Exclusions intelligentes (mots-clés, séparés par virgules)"
+                                       FontSize="12"
+                                       Foreground="{StaticResource AppSubtextColor}" />
+                            <TextBox Foreground="{StaticResource AppTextColor}"
                                      Background="{StaticResource AppCardColor}"
                                      BorderBrush="{StaticResource AppBorderColor}"
                                      BorderThickness="1"
-                                     Text="{x:Bind ViewModel.ScheduledCleanupIntervalHoursText, Mode=TwoWay}" />
-                        </StackPanel>
+                                     FontSize="13"
+                                     MinHeight="32"
+                                     Padding="10,6"
+                                     Text="{x:Bind ViewModel.ExclusionPatterns, Mode=TwoWay}"
+                                     PlaceholderText="ex: setup, iso, games" />
 
-                        <TextBlock Text="{x:Bind ViewModel.HistorySummary, Mode=OneWay}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource AppMutedTextColor}"
-                                   TextWrapping="WrapWholeWords" />
+                            <CheckBox Content="Activer le nettoyage planifié"
+                                      IsChecked="{x:Bind ViewModel.EnableScheduledCleanup, Mode=TwoWay}"
+                                      FontSize="14"
+                                      Foreground="{StaticResource AppTextColor}" />
 
-                        <Button Content="Voir l'historique"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Click="MenuHistory_Click"
-                                HorizontalAlignment="Left" />
-
-                        <TextBlock Text="Ces préférences sont sauvegardées automatiquement."
-                                   FontSize="12"
-                                   Foreground="{StaticResource AppMutedTextColor}"
-                                   TextWrapping="WrapWholeWords" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="3"
-                                Orientation="Horizontal"
-                                HorizontalAlignment="Center"
-                                Spacing="12"
-                                Margin="0,20,0,0">
-                        <Button Content="Annuler" Style="{StaticResource SecondaryButtonStyle}" Click="CloseSettings_Click" />
-                        <Button Content="Enregistrer" Command="{x:Bind ViewModel.SaveSettingsCommand}" Style="{StaticResource PrimaryActionButtonStyle}" Click="CloseSettings_Click" />
-                    </StackPanel>
-                </Grid>
-            </Border>
-        </Grid>
-
-        <!-- Overlay Historique -->
-        <Grid x:Name="OverlayHistory" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed">
-            <Border Background="{StaticResource AppCardColor}"
-                    CornerRadius="15"
-                    Margin="36"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch"
-                    Padding="28,24">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <StackPanel Grid.Row="0" Spacing="10" Margin="0,0,0,12">
-                        <Button Content="← Retour"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Click="CloseHistory_Click"
-                                HorizontalAlignment="Left" />
-                        <TextBlock Text="🕘 Historique"
-                                   FontSize="24"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource AppPrimaryColor}"
-                                   HorizontalAlignment="Center" />
-                    </StackPanel>
-
-                    <Border Grid.Row="1" Height="1" Background="{StaticResource AppBorderColor}" Margin="0,0,0,16" />
-
-                    <ListView Grid.Row="2"
-                              ItemsSource="{x:Bind ViewModel.HistoryItems, Mode=OneWay}"
-                              SelectionMode="None"
-                              HorizontalAlignment="Stretch">
-                        <ListView.ItemTemplate>
-                            <DataTemplate x:DataType="sys:String">
-                                <TextBlock Text="{x:Bind}"
-                                           Foreground="{StaticResource AppTextColor}"
+                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <TextBlock Text="Intervalle (heures):"
                                            FontSize="13"
-                                           TextWrapping="WrapWholeWords"
-                                           Margin="0,6" />
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
+                                           Foreground="{StaticResource AppSubtextColor}"
+                                           VerticalAlignment="Center" />
+                                <TextBox Width="72"
+                                         MinHeight="30"
+                                         Padding="8,4"
+                                         FontSize="13"
+                                         Foreground="{StaticResource AppTextColor}"
+                                         Background="{StaticResource AppCardColor}"
+                                         BorderBrush="{StaticResource AppBorderColor}"
+                                         BorderThickness="1"
+                                         Text="{x:Bind ViewModel.ScheduledCleanupIntervalHoursText, Mode=TwoWay}" />
+                            </StackPanel>
 
-                    <Button Grid.Row="3"
-                            Content="Fermer"
-                            Style="{StaticResource SecondaryButtonStyle}"
-                            Click="CloseHistory_Click"
-                            HorizontalAlignment="Center"
-                            Margin="0,16,0,0" />
-                </Grid>
-            </Border>
-        </Grid>
+                            <TextBlock Text="{x:Bind ViewModel.HistorySummary, Mode=OneWay}"
+                                       FontSize="12"
+                                       Foreground="{StaticResource AppMutedTextColor}"
+                                       TextWrapping="WrapWholeWords" />
 
-        <!-- Overlay À propos -->
-        <Grid x:Name="OverlayAbout" Grid.RowSpan="3" Background="#CC000000" Visibility="Collapsed">
-            <Border Background="{StaticResource AppCardColor}"
-                    CornerRadius="15"
-                    Margin="36"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch"
-                    Padding="32,28">
-                <StackPanel Spacing="0"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center">
-                    <Image Source="ms-appx:///Assets/panosse.png" Width="64" Height="64" Margin="0,0,0,16" />
-                    <TextBlock Text="Panosse"
-                               FontSize="30"
-                               FontWeight="Bold"
-                               Foreground="{StaticResource AppPrimaryColor}"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,6" />
-                    <TextBlock Text="{x:Bind AppVersionText, Mode=OneWay}"
-                               FontSize="15"
-                               Foreground="{StaticResource AppMutedTextColor}"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,18" />
+                            <TextBlock Text="Ces préférences sont sauvegardées automatiquement."
+                                       FontSize="12"
+                                       Foreground="{StaticResource AppMutedTextColor}"
+                                       TextWrapping="WrapWholeWords" />
 
-                    <Button x:Name="AboutCheckUpdatesButton"
-                            Content="🔍 Vérifier les mises à jour"
-                            Click="AboutCheckUpdatesButton_Click"
-                            Style="{StaticResource AboutUpdateButtonStyle}"
-                            HorizontalAlignment="Center"
-                            MinWidth="240"
-                            Margin="0,0,0,12" />
-                    <TextBlock x:Name="AboutLastCheckText"
-                               Text="Dernière vérification : jamais"
-                               FontSize="12"
-                               Foreground="{StaticResource AppMutedTextColor}"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,8" />
-
-                    <StackPanel Spacing="8"
-                                HorizontalAlignment="Stretch"
-                                MaxWidth="360"
-                                Margin="0,0,0,12"
-                                Visibility="{x:Bind ViewModel.IsUpdateAvailable, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <TextBlock Text="{x:Bind ViewModel.UpdateStatusText, Mode=OneWay}"
-                                   FontSize="13"
-                                   Foreground="{StaticResource AppSuccessColor}"
-                                   TextWrapping="WrapWholeWords"
-                                   TextAlignment="Center" />
-                        <ProgressBar Minimum="0"
-                                     Maximum="100"
-                                     Value="{x:Bind ViewModel.UpdateProgressValue, Mode=OneWay}"
-                                     Height="6"
-                                     Foreground="{StaticResource AppSuccessColor}"
-                                     Background="{StaticResource AppBorderColor}"
-                                     Visibility="{x:Bind ViewModel.IsUpdateProgressVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
-                        <Button Content="⬇️ Télécharger la mise à jour"
-                                Command="{x:Bind ViewModel.PrepareUpdateCommand}"
-                                Style="{StaticResource AboutUpdateButtonStyle}"
-                                HorizontalAlignment="Stretch" />
-                        <Button Content="✅ Installer maintenant"
-                                Command="{x:Bind ViewModel.InstallPreparedUpdateCommand}"
-                                Style="{StaticResource PrimaryActionButtonStyle}"
-                                HorizontalAlignment="Stretch"
-                                Visibility="{x:Bind ViewModel.IsInstallReady, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
-                    </StackPanel>
-
-                    <TextBlock Text="La serpillère numérique"
-                               FontSize="17"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource AppTextColor}"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,4" />
-                    <TextBlock Text="pour un PC tout propre"
-                               FontSize="17"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource AppTextColor}"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,22" />
-
-                    <Border Height="1"
-                            Background="{StaticResource AppBorderColor}"
-                            HorizontalAlignment="Stretch"
-                            Margin="0,0,0,18" />
-
-                    <TextBlock Text="Développé par"
-                               FontSize="13"
-                               Foreground="{StaticResource AppMutedTextColor}"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,4" />
-                    <TextBlock Text="Marco Barbaro"
-                               FontSize="17"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource AppTextColor}"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,14" />
-
-                    <HyperlinkButton Content="🔗 GitHub"
-                                     Click="AboutGithubButton_Click"
-                                     HorizontalAlignment="Center"
-                                     FontSize="14"
-                                     Foreground="{StaticResource AppPrimaryColor}"
-                                     Margin="0,0,0,22" />
-
-                    <Button Content="Retour"
-                            Click="CloseAbout_Click"
-                            Style="{StaticResource PrimaryActionButtonStyle}"
-                            HorizontalAlignment="Center"
-                            MinWidth="160"
-                            Padding="32,10"
-                            FontSize="14"
-                            CornerRadius="8" />
+                            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
+                                <Button Content="Enregistrer"
+                                        Command="{x:Bind ViewModel.SaveSettingsCommand}"
+                                        Style="{StaticResource PrimaryActionButtonStyle}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
-            </Border>
-        </Grid>
+            </ScrollViewer>
 
+            <!-- ============ HISTORIQUE ============ -->
+            <ScrollViewer x:Name="HistoryPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="24,20">
+                <StackPanel Spacing="16" MaxWidth="620">
+                    <TextBlock Text="Historique"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AppTextColor}" />
+
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <ListView ItemsSource="{x:Bind ViewModel.HistoryItems, Mode=OneWay}"
+                                  SelectionMode="None"
+                                  MaxHeight="440"
+                                  HorizontalAlignment="Stretch">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="sys:String">
+                                    <TextBlock Text="{x:Bind}"
+                                               Foreground="{StaticResource AppTextColor}"
+                                               FontSize="13"
+                                               TextWrapping="WrapWholeWords"
+                                               Margin="0,6" />
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ============ À PROPOS ============ -->
+            <ScrollViewer x:Name="AboutPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="24,20">
+                <StackPanel Spacing="16" MaxWidth="620">
+                    <TextBlock Text="À propos"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AppTextColor}" />
+
+                    <Border Style="{StaticResource CardBorderStyle}" Padding="32,28">
+                        <StackPanel Spacing="0" HorizontalAlignment="Center">
+                            <Image Source="ms-appx:///Assets/panosse.png" Width="64" Height="64" Margin="0,0,0,16" />
+                            <TextBlock Text="Panosse"
+                                       FontSize="30"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource AppPrimaryColor}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,6" />
+                            <TextBlock Text="{x:Bind AppVersionText, Mode=OneWay}"
+                                       FontSize="15"
+                                       Foreground="{StaticResource AppMutedTextColor}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,18" />
+
+                            <Button x:Name="AboutCheckUpdatesButton"
+                                    Content="🔍 Vérifier les mises à jour"
+                                    Click="AboutCheckUpdatesButton_Click"
+                                    Style="{StaticResource AboutUpdateButtonStyle}"
+                                    HorizontalAlignment="Center"
+                                    MinWidth="240"
+                                    Margin="0,0,0,12" />
+                            <TextBlock x:Name="AboutLastCheckText"
+                                       Text="Dernière vérification : jamais"
+                                       FontSize="12"
+                                       Foreground="{StaticResource AppMutedTextColor}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,8" />
+
+                            <StackPanel Spacing="8"
+                                        HorizontalAlignment="Stretch"
+                                        MaxWidth="360"
+                                        Margin="0,0,0,12"
+                                        Visibility="{x:Bind ViewModel.IsUpdateAvailable, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="{x:Bind ViewModel.UpdateStatusText, Mode=OneWay}"
+                                           FontSize="13"
+                                           Foreground="{StaticResource AppSuccessColor}"
+                                           TextWrapping="WrapWholeWords"
+                                           TextAlignment="Center" />
+                                <ProgressBar Minimum="0"
+                                             Maximum="100"
+                                             Value="{x:Bind ViewModel.UpdateProgressValue, Mode=OneWay}"
+                                             Height="6"
+                                             Foreground="{StaticResource AppSuccessColor}"
+                                             Background="{StaticResource AppBorderColor}"
+                                             Visibility="{x:Bind ViewModel.IsUpdateProgressVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <Button Content="⬇️ Télécharger la mise à jour"
+                                        Command="{x:Bind ViewModel.PrepareUpdateCommand}"
+                                        Style="{StaticResource AboutUpdateButtonStyle}"
+                                        HorizontalAlignment="Stretch" />
+                                <Button Content="✅ Installer maintenant"
+                                        Command="{x:Bind ViewModel.InstallPreparedUpdateCommand}"
+                                        Style="{StaticResource PrimaryActionButtonStyle}"
+                                        HorizontalAlignment="Stretch"
+                                        Visibility="{x:Bind ViewModel.IsInstallReady, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            </StackPanel>
+
+                            <TextBlock Text="La serpillère numérique"
+                                       FontSize="17"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource AppTextColor}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,4" />
+                            <TextBlock Text="pour un PC tout propre"
+                                       FontSize="17"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource AppTextColor}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,22" />
+
+                            <Border Height="1"
+                                    Background="{StaticResource AppBorderColor}"
+                                    HorizontalAlignment="Stretch"
+                                    Margin="0,0,0,18" />
+
+                            <TextBlock Text="Développé par"
+                                       FontSize="13"
+                                       Foreground="{StaticResource AppMutedTextColor}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,4" />
+                            <TextBlock Text="Marco Barbaro"
+                                       FontSize="17"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource AppTextColor}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,14" />
+
+                            <HyperlinkButton Content="🔗 GitHub"
+                                             Click="AboutGithubButton_Click"
+                                             HorizontalAlignment="Center"
+                                             FontSize="14"
+                                             Foreground="{StaticResource AppPrimaryColor}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
     </Grid>
 </Page>

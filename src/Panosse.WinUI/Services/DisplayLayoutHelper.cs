@@ -8,13 +8,13 @@ namespace Panosse.WinUI.Services;
 
 /// <summary>
 /// Calcule une taille de fenêtre adaptée à la zone de travail et au facteur DPI courant.
-/// Cible les résolutions fréquentes (1366×768, 1920×1080, 2560×1440) avec échelles 100–200 %.
+/// Taille de référence compacte type PC Manager (~720×680), clampée à la zone utile.
 /// </summary>
 internal static class DisplayLayoutHelper
 {
     // Taille de référence à 100 % (pixels effectifs XAML).
-    private const double BaseWidth = 540;
-    private const double BaseHeight = 880;
+    private const double BaseWidth = 720;
+    private const double BaseHeight = 680;
 
     public static SizeInt32 CalculateWindowSize(Window window)
     {
@@ -37,14 +37,14 @@ internal static class DisplayLayoutHelper
         int horizontalMargin = (int)Math.Round(48 * scale);
         int verticalMargin = (int)Math.Round(56 * scale);
 
-        int maxWidth = Math.Max((int)Math.Round(400 * scale), workArea.Width - horizontalMargin);
-        int maxHeight = Math.Max((int)Math.Round(620 * scale), workArea.Height - verticalMargin);
+        int maxWidth = Math.Max((int)Math.Round(600 * scale), workArea.Width - horizontalMargin);
+        int maxHeight = Math.Max((int)Math.Round(520 * scale), workArea.Height - verticalMargin);
 
-        int minWidth = (int)Math.Round(480 * scale);
-        int minHeight = (int)Math.Round(700 * scale);
+        int minWidth = (int)Math.Round(660 * scale);
+        int minHeight = (int)Math.Round(600 * scale);
 
-        width = Math.Clamp(width, minWidth, maxWidth);
-        height = Math.Clamp(height, minHeight, maxHeight);
+        width = Math.Clamp(width, Math.Min(minWidth, maxWidth), maxWidth);
+        height = Math.Clamp(height, Math.Min(minHeight, maxHeight), maxHeight);
 
         return new SizeInt32(width, height);
     }

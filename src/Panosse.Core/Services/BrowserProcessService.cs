@@ -8,14 +8,18 @@ using System.Threading.Tasks;
 namespace Panosse.Services;
 
 /// <summary>
-/// Detects and closes Chrome/Edge browser processes without touching WebView2 hosts.
+/// Detects and closes supported browser processes without touching WebView2 hosts.
 /// </summary>
 public sealed class BrowserProcessService : IBrowserProcessService
 {
-    private static readonly (string DisplayName, string ProcessName)[] KnownBrowsers =
+    private static readonly (string DisplayName, string[] ProcessNames)[] KnownBrowsers =
     [
-        ("Chrome", "chrome"),
-        ("Edge", "msedge")
+        ("Chrome", ["chrome"]),
+        ("Edge", ["msedge"]),
+        ("Firefox", ["firefox"]),
+        ("Opera", ["opera", "opera_gx"]),
+        ("Brave", ["brave"]),
+        ("Vivaldi", ["vivaldi"])
     ];
 
     public Task<IReadOnlyList<string>> GetRunningBrowsersAsync(CancellationToken cancellationToken = default)
@@ -24,9 +28,9 @@ public sealed class BrowserProcessService : IBrowserProcessService
         {
             cancellationToken.ThrowIfCancellationRequested();
             var running = new List<string>();
-            foreach ((string displayName, string processName) in KnownBrowsers)
+            foreach ((string displayName, string[] processNames) in KnownBrowsers)
             {
-                if (HasRunningProcess(processName))
+                if (processNames.Any(HasRunningProcess))
                 {
                     running.Add(displayName);
                 }
@@ -54,13 +58,22 @@ public sealed class BrowserProcessService : IBrowserProcessService
             foreach (string displayName in targets)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                string? processName = ResolveProcessName(displayName);
-                if (processName is null)
+                IReadOnlyList<string>? processNames = ResolveProcessNames(displayName);
+                if (processNames is null)
                 {
                     continue;
                 }
 
-                if (TryCloseBrowser(processName, cancellationToken))
+                bool allClosed = true;
+                foreach (string processName in processNames)
+                {
+                    if (!TryCloseBrowser(processName, cancellationToken))
+                    {
+                        allClosed = false;
+                    }
+                }
+
+                if (allClosed)
                 {
                     closed.Add(displayName);
                 }
@@ -70,9 +83,10 @@ public sealed class BrowserProcessService : IBrowserProcessService
             Thread.Sleep(750);
 
             var remaining = new List<string>();
-            foreach ((string displayName, string processName) in KnownBrowsers)
+            foreach ((string displayName, string[] processNames) in KnownBrowsers)
             {
-                if (targets.Contains(displayName, StringComparer.OrdinalIgnoreCase) && HasRunningProcess(processName))
+                if (targets.Contains(displayName, StringComparer.OrdinalIgnoreCase) &&
+                    processNames.Any(HasRunningProcess))
                 {
                     remaining.Add(displayName);
                 }
@@ -86,13 +100,13 @@ public sealed class BrowserProcessService : IBrowserProcessService
         }, cancellationToken);
     }
 
-    private static string? ResolveProcessName(string displayName)
+    private static IReadOnlyList<string>? ResolveProcessNames(string displayName)
     {
-        foreach ((string knownDisplay, string processName) in KnownBrowsers)
+        foreach ((string knownDisplay, string[] processNames) in KnownBrowsers)
         {
             if (string.Equals(knownDisplay, displayName, StringComparison.OrdinalIgnoreCase))
             {
-                return processName;
+                return processNames;
             }
         }
 
@@ -179,7 +193,7 @@ public sealed class BrowserProcessService : IBrowserProcessService
 
     private static void ForceKillByName(string processName)
     {
-        // Prefer taskkill tree kill: Edge/Chrome spawn many helper processes.
+        // Prefer taskkill tree kill: browsers spawn many helper processes.
         try
         {
             using var killer = Process.Start(new ProcessStartInfo

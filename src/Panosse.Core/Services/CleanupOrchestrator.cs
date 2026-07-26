@@ -34,7 +34,7 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
     {
         options ??= new CleanupExecutionOptions();
         bool preview = options.PreviewOnly;
-        int totalSteps = 8;
+        int totalSteps = 12;
         int step = 0;
 
         var stopwatch = Stopwatch.StartNew();
@@ -48,6 +48,10 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
             ("🧹 Nettoyage des fichiers temporaires...", _ => RunOrEstimateAsync(preview, cleanupService.CleanTemporaryFiles, 0), b => $"✅ Fichiers temporaires traités ({ToMb(b)} Mo)"),
             ("🌐 Nettoyage du cache Chrome...", _ => RunOrEstimateAsync(preview, cleanupService.CleanChromeCache, 0), b => $"✅ Cache Chrome traité ({ToMb(b)} Mo)"),
             ("🌐 Nettoyage du cache Edge...", _ => RunOrEstimateAsync(preview, cleanupService.CleanEdgeCache, 0), b => $"✅ Cache Edge traité ({ToMb(b)} Mo)"),
+            ("🌐 Nettoyage du cache Firefox...", _ => RunOrEstimateAsync(preview, cleanupService.CleanFirefoxCache, 0), b => $"✅ Cache Firefox traité ({ToMb(b)} Mo)"),
+            ("🌐 Nettoyage du cache Opera...", _ => RunOrEstimateAsync(preview, cleanupService.CleanOperaCache, 0), b => $"✅ Cache Opera traité ({ToMb(b)} Mo)"),
+            ("🌐 Nettoyage du cache Brave...", _ => RunOrEstimateAsync(preview, cleanupService.CleanBraveCache, 0), b => $"✅ Cache Brave traité ({ToMb(b)} Mo)"),
+            ("🌐 Nettoyage du cache Vivaldi...", _ => RunOrEstimateAsync(preview, cleanupService.CleanVivaldiCache, 0), b => $"✅ Cache Vivaldi traité ({ToMb(b)} Mo)"),
             ("📋 Nettoyage du registre...", _ => RunOrEstimateAsync(preview, () => { cleanupService.CleanRegistry(); return 0L; }, 0), _ => "✅ Registre traité"),
             ("📥 Nettoyage des téléchargements anciens...", _ => RunOrEstimateAsync(preview, () => cleanupService.CleanOldDownloads(options.ExclusionPatterns), EstimateOldDownloads(options.ExclusionPatterns)), b => $"✅ Téléchargements traités ({ToMb(b)} Mo)"),
             ("📄 Nettoyage des logs Windows...", _ => RunOrEstimateAsync(preview, cleanupService.CleanWindowsLogs, 0), b => $"✅ Logs Windows traités ({ToMb(b)} Mo)"),
