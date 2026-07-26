@@ -57,22 +57,24 @@ jobs:
         & $iscc "/DMyAppVersion=$version" "Panosse-Setup.iss"
         if ($LASTEXITCODE -ne 0) { throw "Compilation Inno Setup echouee" }
 
-    - name: Rename executable
+    - name: Package portable artifacts
+      shell: pwsh
       run: |
-        $version = "${{ github.ref_name }}"
-        if (Test-Path "publish\Panosse.exe") {
-          Move-Item -Path "publish\Panosse.exe" -Destination "publish\Panosse-$version.exe" -Force
-        } else {
+        $tag = "${{ github.ref_name }}"
+        if (-not (Test-Path "publish\Panosse.exe")) {
           throw "publish\Panosse.exe introuvable"
         }
+        # WinUI single-file MUST keep the assembly name (Panosse.exe).
+        # Renaming the exe breaks Microsoft.UI.Xaml resource loading (0xC000027B).
+        Compress-Archive -Path "publish\Panosse.exe" -DestinationPath "publish\Panosse-$tag-portable.zip" -Force
 
     - name: Calculate SHA256
       id: checksum
+      shell: pwsh
       run: |
-        $version = "${{ github.ref_name }}"
-        $hash = (Get-FileHash -Path "publish\Panosse-$version.exe" -Algorithm SHA256).Hash
+        $hash = (Get-FileHash -Path "publish\Panosse.exe" -Algorithm SHA256).Hash
         echo "sha256=$hash" >> $env:GITHUB_OUTPUT
-        echo "$hash  Panosse-$version.exe" > publish\SHA256SUMS.txt
+        Set-Content -Path "publish\SHA256SUMS.txt" -Value "$hash  Panosse.exe" -Encoding ascii
 
     - name: Generate release notes
       shell: pwsh
@@ -85,10 +87,15 @@ jobs:
 
         ### Installation
 
-        - **Portable** : téléchargez ``Panosse-$version.exe`` et lancez-le (aucune installation).
-        - **Installateur** : utilisez ``Panosse-Setup-$version.exe`` pour une installation classique dans Program Files.
+        - **Portable** : téléchargez ``Panosse-$version-portable.zip``, extrayez puis lancez ``Panosse.exe`` (ne renommez pas le fichier).
+        - **Installateur** : utilisez ``Panosse-Setup-$version.exe`` pour une installation dans Program Files.
 
         Les mises à jour depuis l'application vérifient l'intégrité via SHA256.
+
+        ### Correctifs
+
+        - Fermeture Edge/Chrome plus fiable (plus de freeze UI / WebView2)
+        - Portable WinUI : l'exécutable doit rester nommé ``Panosse.exe``
 
         ### Fonctionnalités
 
@@ -103,7 +110,7 @@ jobs:
         - Windows 10/11 (x64)
         - Droits administrateur pour certaines opérations
 
-        ### Checksum SHA256 (portable)
+        ### Checksum SHA256 (``Panosse.exe``)
 
         ``````
         ${{ steps.checksum.outputs.sha256 }}
@@ -118,7 +125,8 @@ jobs:
         name: Panosse ${{ github.ref_name }}
         body_path: publish/RELEASE_NOTES.md
         files: |
-          publish/Panosse-${{ github.ref_name }}.exe
+          publish/Panosse.exe
+          publish/Panosse-${{ github.ref_name }}-portable.zip
           publish/SHA256SUMS.txt
           installer/Panosse-Setup-${{ github.ref_name }}.exe
         fail_on_unmatched_files: true

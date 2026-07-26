@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Panosse.Core.ViewModels;
+using Panosse.Services;
 using Panosse.WinUI.Services;
 
 namespace Panosse.WinUI.Views
@@ -16,15 +18,19 @@ namespace Panosse.WinUI.Views
     {
         public ShellViewModel ViewModel { get; }
         public string AppVersionText { get; } = $"v{Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.0.0"}";
+        private readonly IBrowserProcessService browserProcessService;
         private List<string> navigateursEnCours = new();
         private bool isClosingBrowsers;
+        private CancellationTokenSource? browserCloseCts;
 
         public MainPage()
         {
             ViewModel = App.GetRequiredService<ShellViewModel>();
+            browserProcessService = App.GetRequiredService<IBrowserProcessService>();
             InitializeComponent();
             this.Loaded += MainPage_Loaded;
             this.KeyDown += MainPage_KeyDown;
+            this.Unloaded += MainPage_Unloaded;
         }
 
         private async void MainPage_Loaded(object sender, RoutedEventArgs e)
@@ -33,20 +39,24 @@ namespace Panosse.WinUI.Views
             await CheckBrowsersAsync();
         }
 
+        private void MainPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            browserCloseCts?.Cancel();
+            browserCloseCts?.Dispose();
+            browserCloseCts = null;
+        }
+
         private async Task CheckBrowsersAsync()
         {
-            navigateursEnCours = await Task.Run(() =>
+            try
             {
-                var browsers = new List<string>();
-                try
-                {
-                    var processes = Process.GetProcesses();
-                    if (processes.Any(p => p.ProcessName.ToLower().Contains("chrome"))) browsers.Add("Chrome");
-                    if (processes.Any(p => p.ProcessName.ToLower().Contains("msedge"))) browsers.Add("Edge");
-                }
-                catch { }
-                return browsers;
-            });
+                IReadOnlyList<string> browsers = await browserProcessService.GetRunningBrowsersAsync();
+                navigateursEnCours = browsers.ToList();
+            }
+            catch
+            {
+                navigateursEnCours = new List<string>();
+            }
 
             if (navigateursEnCours.Count > 0)
             {
@@ -75,40 +85,44 @@ namespace Panosse.WinUI.Views
             BrowserWarningLink.IsEnabled = false;
             ViewModel.StatusText = "Fermeture des navigateurs en cours...";
 
+            browserCloseCts?.Cancel();
+            browserCloseCts?.Dispose();
+            browserCloseCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+
             try
             {
-                foreach (var browser in navigateursEnCours)
-                {
-                    string processName = browser == "Chrome" ? "chrome" : "msedge";
-                    var processes = Process.GetProcesses().Where(p => p.ProcessName.ToLower().Contains(processName));
-                    foreach (var process in processes)
-                    {
-                        try
-                        {
-                            process.CloseMainWindow();
-                            if (!process.WaitForExit(1000))
-                            {
-                                process.Kill();
-                            }
-                        }
-                        catch { }
-                    }
-                }
+                BrowserCloseResult result = await browserProcessService.CloseBrowsersAsync(
+                    navigateursEnCours,
+                    browserCloseCts.Token);
 
-                await Task.Delay(1000);
+                await CheckBrowsersAsync();
+
+                if (result.AllClosed || navigateursEnCours.Count == 0)
+                {
+                    ViewModel.StatusText = "Navigateurs fermes. Nettoyage complet possible.";
+                }
+                else
+                {
+                    string remaining = string.Join(" et ", result.RemainingBrowsers);
+                    ViewModel.StatusText = $"{remaining} reste ouvert. Fermez-le manuellement puis reessayez.";
+                }
+            }
+            catch (OperationCanceledException)
+            {
                 await CheckBrowsersAsync();
                 ViewModel.StatusText = navigateursEnCours.Count == 0
                     ? "Navigateurs fermes. Nettoyage complet possible."
-                    : "Certains navigateurs restent ouverts. Fermez-les manuellement.";
+                    : "Fermeture interrompue. Fermez les navigateurs manuellement.";
             }
             catch
             {
+                await CheckBrowsersAsync();
                 ViewModel.StatusText = "Erreur lors de la fermeture automatique des navigateurs.";
             }
             finally
             {
                 isClosingBrowsers = false;
-                BrowserWarningLink.IsEnabled = true;
+                BrowserWarningLink.IsEnabled = navigateursEnCours.Count > 0;
             }
         }
 

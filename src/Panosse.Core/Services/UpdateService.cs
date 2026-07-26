@@ -107,7 +107,8 @@ public sealed class UpdateService : IUpdateService
                 continue;
             }
 
-            if (assetName.StartsWith("Panosse-v", StringComparison.OrdinalIgnoreCase))
+            // Prefer exact assembly name: WinUI single-file crashes if the exe is renamed.
+            if (assetName.Equals("Panosse.exe", StringComparison.OrdinalIgnoreCase))
             {
                 preferredUrl = browserUrl;
                 preferredName = assetName;
