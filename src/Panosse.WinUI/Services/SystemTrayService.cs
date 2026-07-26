@@ -26,7 +26,10 @@ public sealed class SystemTrayService : ISystemTrayService
     private const int MenuShow = 1001;
     private const int MenuCleanup = 1002;
     private const int MenuExit = 1003;
-    private const int IdiApplication = 32512;
+
+    private const uint ImageIcon = 1;
+    private const uint LrLoadFromFile = 0x0010;
+    private const uint LrDefaultSize = 0x0040;
 
     private IntPtr hWnd = IntPtr.Zero;
     private IntPtr hIcon = IntPtr.Zero;
@@ -177,7 +180,7 @@ public sealed class SystemTrayService : ISystemTrayService
 
     private void AddNotifyIcon()
     {
-        hIcon = LoadIcon(IntPtr.Zero, (IntPtr)IdiApplication);
+        hIcon = LoadPanosseIcon();
         if (hIcon == IntPtr.Zero)
         {
             throw new InvalidOperationException("Unable to load tray icon.");
@@ -191,6 +194,39 @@ public sealed class SystemTrayService : ISystemTrayService
 
         data.uVersion = NotifyIconVersion4;
         _ = Shell_NotifyIcon(NimSetVersion, ref data);
+    }
+
+    private static IntPtr LoadPanosseIcon()
+    {
+        foreach (string candidate in GetIconCandidates())
+        {
+            if (!File.Exists(candidate))
+            {
+                continue;
+            }
+
+            IntPtr icon = LoadImage(
+                IntPtr.Zero,
+                candidate,
+                ImageIcon,
+                0,
+                0,
+                LrLoadFromFile | LrDefaultSize);
+
+            if (icon != IntPtr.Zero)
+            {
+                return icon;
+            }
+        }
+
+        return IntPtr.Zero;
+    }
+
+    private static IEnumerable<string> GetIconCandidates()
+    {
+        string baseDir = AppContext.BaseDirectory;
+        yield return Path.Combine(baseDir, "Assets", "panosse.ico");
+        yield return Path.Combine(baseDir, "panosse.ico");
     }
 
     private void RemoveNotifyIcon()
@@ -214,7 +250,7 @@ public sealed class SystemTrayService : ISystemTrayService
             uFlags = NifMessage | NifIcon | NifTip,
             uCallbackMessage = TrayMessage,
             hIcon = hIcon,
-            szTip = "Panosse (WinUI)"
+            szTip = "Panosse"
         };
     }
 
@@ -298,8 +334,14 @@ public sealed class SystemTrayService : ISystemTrayService
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool DestroyWindow(IntPtr hWnd);
 
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr LoadIcon(IntPtr hInstance, IntPtr lpIconName);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr LoadImage(
+        IntPtr hInst,
+        string name,
+        uint type,
+        int cx,
+        int cy,
+        uint fuLoad);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool DestroyIcon(IntPtr hIcon);
