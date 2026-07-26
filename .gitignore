@@ -1,19 +1,32 @@
 # Build results
 bin/
 obj/
+**/bin/
+**/obj/
 publish/
+publish-*/
 publish-x86/
 publish-framework/
+publish-notrim/
+publish-sf/
+publish-test/
 installer/
+.release-assets/
 
 # Archives et installateurs
 *.zip
 *.exe
-!assets/*.ico
-
-# Installateurs temporaires
+!src/Panosse.WinUI/Assets/*.ico
+innosetup*.exe
 git-installer.exe
 innosetup-installer.exe
+
+# Update harness local binaries (keep scripts only)
+update-test/**/*.exe
+update-test/**/*.bak
+update-test/Panosse-ui-test/
+update-test/portable-diag*/
+update-test/retest-*/
 
 # Visual Studio / Rider
 .vs/
@@ -21,15 +34,10 @@ innosetup-installer.exe
 *.user
 *.suo
 *.userprefs
-
-# Rider
-.idea/
 *.sln.iml
 
 # User-specific files
 *.rsuser
-*.suo
-*.user
 *.userosscache
 *.sln.docstates
 
@@ -84,20 +92,13 @@ _ReSharper*/
 *.[Rr]e[Ss]harper
 *.DotSettings.user
 
-# JetBrains Rider
-.idea/
-
 # Windows image file caches
 Thumbs.db
 ehthumbs.db
-
-# Folder config file
 Desktop.ini
-
-# Recycle Bin
 $RECYCLE.BIN/
 
-# Mac desktop service store files
+# Mac
 .DS_Store
 
 # VS Code
