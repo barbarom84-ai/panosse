@@ -41,7 +41,7 @@ if (!File.Exists(currentExe))
     return 0;
 }
 
-var orchestrator = new UpdateOrchestrator(
+using var orchestrator = new UpdateOrchestrator(
     new TelemetryService(),
     new OperationHistoryService(),
     new LoggingService());
