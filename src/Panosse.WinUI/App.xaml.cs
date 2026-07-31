@@ -14,9 +14,7 @@ namespace Panosse.WinUI
     /// </summary>
     public partial class App : Application
     {
-        private static Mutex? instanceMutex;
-        private const string MutexName = "Panosse_Unique_Mutex_99";
-
+        private SingleInstanceCoordinator? singleInstance;
         private Window? window;
         private ISystemTrayService? systemTrayService;
         private IGlobalHotkeyService? globalHotkeyService;
@@ -29,13 +27,8 @@ namespace Panosse.WinUI
 
         public App()
         {
-            instanceMutex = new Mutex(true, MutexName, out bool isNewInstance);
-            if (!isNewInstance)
+            if (!SingleInstanceCoordinator.TryClaimPrimary(out singleInstance))
             {
-                ShowMessageBox(
-                    "Panosse est déjà active dans la barre des tâches.\n\n" +
-                    "Astuce : cliquez sur l'icône dans la zone de notification pour afficher la fenêtre.",
-                    "Panosse - Déjà active");
                 Environment.Exit(0);
             }
 
@@ -94,6 +87,10 @@ namespace Panosse.WinUI
             window.Activate();
 
             InitializeSystemTrayAndHotkey();
+            singleInstance?.StartActivationWatcher(() =>
+            {
+                _ = window?.DispatcherQueue.TryEnqueue(BringWindowToFront);
+            });
         }
 
         /// <summary>
@@ -243,30 +240,18 @@ namespace Panosse.WinUI
             resourcesDisposed = true;
             globalHotkeyService?.Dispose();
             systemTrayService?.Dispose();
-            if (instanceMutex is not null)
-            {
-                instanceMutex.ReleaseMutex();
-                instanceMutex.Dispose();
-                instanceMutex = null;
-            }
+            singleInstance?.Dispose();
+            singleInstance = null;
             if (Services is IDisposable disposableProvider)
             {
                 disposableProvider.Dispose();
             }
         }
 
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        private static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
-
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-        private static void ShowMessageBox(string text, string caption)
-        {
-            _ = MessageBox(IntPtr.Zero, text, caption, 0x40);
-        }
     }
 }
