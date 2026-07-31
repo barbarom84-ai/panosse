@@ -13,10 +13,13 @@ public sealed class SystemTrayService : ISystemTrayService
     private const uint NifMessage = 0x00000001;
     private const uint NifIcon = 0x00000002;
     private const uint NifTip = 0x00000004;
+    private const uint NifInfo = 0x00000010;
     private const uint NimAdd = 0x00000000;
+    private const uint NimModify = 0x00000001;
     private const uint NimDelete = 0x00000002;
     private const uint NimSetVersion = 0x00000004;
     private const uint NotifyIconVersion4 = 4;
+    private const uint NIIFInfo = 0x00000001;
 
     private const uint MfString = 0x00000000;
     private const uint TpmBottomAlign = 0x0020;
@@ -49,6 +52,22 @@ public sealed class SystemTrayService : ISystemTrayService
         wndProcDelegate = WndProc;
         EnsureMessageWindow();
         AddNotifyIcon();
+    }
+
+    public void ShowNotification(string title, string message)
+    {
+        ThrowIfDisposed();
+        if (hWnd == IntPtr.Zero || hIcon == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var data = CreateNotifyData();
+        data.uFlags = NifInfo;
+        data.szInfoTitle = Truncate(title, 63);
+        data.szInfo = Truncate(message, 255);
+        data.dwInfoFlags = NIIFInfo;
+        _ = Shell_NotifyIcon(NimModify, ref data);
     }
 
     public void Dispose()
@@ -252,6 +271,16 @@ public sealed class SystemTrayService : ISystemTrayService
             hIcon = hIcon,
             szTip = "Panosse"
         };
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length <= maxLength)
+        {
+            return value ?? string.Empty;
+        }
+
+        return value[..maxLength];
     }
 
     private void ThrowIfDisposed()

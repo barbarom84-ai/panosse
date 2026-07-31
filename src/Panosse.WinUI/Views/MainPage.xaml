@@ -444,6 +444,15 @@
                                FontWeight="SemiBold"
                                Foreground="{StaticResource AppTextColor}" />
 
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Ouvrir les logs"
+                                Command="{x:Bind ViewModel.OpenLogsCommand}"
+                                Style="{StaticResource SecondaryButtonStyle}" />
+                        <Button Content="Effacer l'historique"
+                                Command="{x:Bind ViewModel.ClearHistoryCommand}"
+                                Style="{StaticResource SecondaryButtonStyle}" />
+                    </StackPanel>
+
                     <Border Style="{StaticResource CardBorderStyle}">
                         <ListView ItemsSource="{x:Bind ViewModel.HistoryItems, Mode=OneWay}"
                                   SelectionMode="None"

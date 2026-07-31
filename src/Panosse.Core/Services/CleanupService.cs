@@ -84,10 +84,23 @@ public sealed class CleanupService : ICleanupService
     private long CleanChromiumProfiles(string userDataPath)
     {
         long size = 0;
+        string[] cacheRelativePaths =
+        [
+            "Cache",
+            "Code Cache",
+            "GPUCache",
+            Path.Combine("Service Worker", "CacheStorage"),
+            Path.Combine("Service Worker", "ScriptCache"),
+            "GrShaderCache",
+            "ShaderCache"
+        ];
+
         foreach (string profilePath in GetProfileDirectories(userDataPath))
         {
-            size += CleanDirectory(Path.Combine(profilePath, "Cache"));
-            size += CleanDirectory(Path.Combine(profilePath, "Code Cache"));
+            foreach (string relative in cacheRelativePaths)
+            {
+                size += CleanDirectory(Path.Combine(profilePath, relative));
+            }
         }
 
         return size;
@@ -121,6 +134,7 @@ public sealed class CleanupService : ICleanupService
         long size = 0;
         size += CleanDirectory(Path.Combine(profilePath, "Cache"));
         size += CleanDirectory(Path.Combine(profilePath, "Code Cache"));
+        size += CleanDirectory(Path.Combine(profilePath, "GPUCache"));
         size += CleanChromiumProfiles(profilePath);
         return size;
     }
@@ -244,8 +258,9 @@ public sealed class CleanupService : ICleanupService
                         continue;
                     }
 
-                    deletedSize += file.Length;
+                    long size = file.Length;
                     file.Delete();
+                    deletedSize += size;
                 }
                 catch
                 {
@@ -292,8 +307,9 @@ public sealed class CleanupService : ICleanupService
                 {
                     if (file.LastWriteTime < threshold)
                     {
-                        deletedSize += file.Length;
+                        long size = file.Length;
                         file.Delete();
+                        deletedSize += size;
                     }
                 }
                 catch { }
@@ -305,8 +321,9 @@ public sealed class CleanupService : ICleanupService
                 {
                     if (file.LastWriteTime < threshold)
                     {
-                        deletedSize += file.Length;
+                        long size = file.Length;
                         file.Delete();
+                        deletedSize += size;
                     }
                 }
                 catch { }
@@ -316,8 +333,9 @@ public sealed class CleanupService : ICleanupService
             {
                 try
                 {
-                    deletedSize += file.Length;
+                    long size = file.Length;
                     file.Delete();
+                    deletedSize += size;
                 }
                 catch { }
             }
@@ -347,8 +365,9 @@ public sealed class CleanupService : ICleanupService
             {
                 try
                 {
-                    deletedSize += file.Length;
+                    long size = file.Length;
                     file.Delete();
+                    deletedSize += size;
                 }
                 catch { }
             }
@@ -357,8 +376,9 @@ public sealed class CleanupService : ICleanupService
             {
                 try
                 {
-                    deletedSize += file.Length;
+                    long size = file.Length;
                     file.Delete();
+                    deletedSize += size;
                 }
                 catch { }
             }
@@ -386,8 +406,9 @@ public sealed class CleanupService : ICleanupService
             {
                 try
                 {
-                    deletedSize += file.Length;
+                    long size = file.Length;
                     file.Delete();
+                    deletedSize += size;
                 }
                 catch { }
             }
@@ -415,8 +436,9 @@ public sealed class CleanupService : ICleanupService
             {
                 try
                 {
-                    deletedSize += file.Length;
+                    long size = file.Length;
                     file.Delete();
+                    deletedSize += size;
                 }
                 catch { }
             }

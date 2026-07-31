@@ -21,6 +21,7 @@ namespace Panosse.WinUI
         private ISystemTrayService? systemTrayService;
         private IGlobalHotkeyService? globalHotkeyService;
         private bool resourcesDisposed;
+        private bool isExiting;
 
         public static Window MainWindow { get; private set; } = null!;
 
@@ -67,6 +68,18 @@ namespace Panosse.WinUI
                 presenter.IsResizable = false;
                 presenter.IsMaximizable = false;
             }
+
+            appWindow.Closing += (_, args) =>
+            {
+                if (isExiting)
+                {
+                    return;
+                }
+
+                // Fermer la fenêtre = masquer dans le tray (Quitter via le menu tray).
+                args.Cancel = true;
+                HideMainWindow();
+            };
             
             window.ExtendsContentIntoTitleBar = false;
 
@@ -158,13 +171,28 @@ namespace Panosse.WinUI
                 onExitRequested: ExitApplication);
 
             IntPtr hWnd = WindowNative.GetWindowHandle(window);
-            _ = globalHotkeyService.Register(hWnd);
+            bool hotkeyRegistered = globalHotkeyService.Register(hWnd);
+            if (!hotkeyRegistered)
+            {
+                systemTrayService.ShowNotification(
+                    "Panosse",
+                    "Impossible d'enregistrer Ctrl+Alt+P (raccourci déjà pris).");
+            }
+
             globalHotkeyService.HotkeyPressed += (_, _) => TriggerCleanupFromTray();
 
-            window.Closed += (_, _) =>
+            // Closed ne doit plus disposer tray/hotkey : la fenêtre se masque via Closing.
+        }
+
+        private void HideMainWindow()
+        {
+            if (window == null)
             {
-                DisposeResources();
-            };
+                return;
+            }
+
+            IntPtr hWnd = WindowNative.GetWindowHandle(window);
+            _ = ShowWindow(hWnd, SwHide);
         }
 
         private void BringWindowToFront()
@@ -174,6 +202,8 @@ namespace Panosse.WinUI
                 return;
             }
 
+            IntPtr hWnd = WindowNative.GetWindowHandle(window);
+            _ = ShowWindow(hWnd, SwShow);
             window.Activate();
         }
 
@@ -188,7 +218,9 @@ namespace Panosse.WinUI
 
         private void ExitApplication()
         {
+            isExiting = true;
             DisposeResources();
+            window?.Close();
             Environment.Exit(0);
         }
 
@@ -216,6 +248,12 @@ namespace Panosse.WinUI
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private const int SwHide = 0;
+        private const int SwShow = 5;
 
         private static void ShowMessageBox(string text, string caption)
         {

@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Panosse.Core/Panosse.Core.csproj" />
+    <Project Path="src/Panosse.Core.Tests/Panosse.Core.Tests.csproj" />
     <Project Path="src/Panosse.WinUI/Panosse.WinUI.csproj" />
   </Folder>
 </Solution>

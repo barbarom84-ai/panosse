@@ -8,4 +8,8 @@
     <RootNamespace>Panosse.Core</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Panosse.Core.Tests" />
+  </ItemGroup>
+
 </Project>

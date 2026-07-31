@@ -58,6 +58,14 @@ public sealed class OperationHistoryService : IOperationHistoryService
         }
     }
 
+    public void Clear()
+    {
+        lock (syncRoot)
+        {
+            SaveNoThrow(new List<OperationHistoryEntry>());
+        }
+    }
+
     private List<OperationHistoryEntry> LoadNoThrow()
     {
         try

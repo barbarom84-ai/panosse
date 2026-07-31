@@ -16,7 +16,7 @@ using Panosse.Services;
 
 namespace Panosse.Core.ViewModels;
 
-public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
+public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
 {
     private string statusText = "Pret";
     private string buttonText = "Passer la panosse";
@@ -66,7 +66,12 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
     private readonly IUpdateService updateService;
     private readonly IUpdateOrchestrator updateOrchestrator;
     private const string GithubRepo = "barbarom84-ai/panosse";
-    private static readonly TimeSpan MinimumCleanupDuration = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan MinimumCleanupDuration = TimeSpan.FromSeconds(1.5);
+
+    /// <summary>
+    /// Optional UI-thread marshaler (set by WinUI host for timer/property updates).
+    /// </summary>
+    public Action<Action>? UiMarshal { get; set; }
 
     public ShellViewModel(
         ICleanupOrchestrator cleanupOrchestrator,
@@ -90,6 +95,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
 
         SaveSettingsCommand = new RelayCommand(SaveSettings);
         RefreshHistoryCommand = new RelayCommand(RefreshHistory);
+        ClearHistoryCommand = new RelayCommand(ClearHistory);
         CheckUpdatesCommand = new AsyncRelayCommand(
             executeAsync: ExecuteCheckUpdatesAsync,
             canExecute: () => !IsCheckingUpdate && !IsPreparingUpdate,
@@ -118,6 +124,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
     public ICommand RunCleanupCommand { get; }
     public ICommand SaveSettingsCommand { get; }
     public ICommand RefreshHistoryCommand { get; }
+    public ICommand ClearHistoryCommand { get; }
     public ICommand CheckUpdatesCommand { get; }
     public ICommand PrepareUpdateCommand { get; }
     public ICommand InstallPreparedUpdateCommand { get; }
@@ -576,14 +583,49 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
                 HistoryItems.Add($"{entry.TimestampUtc.ToLocalTime():dd/MM HH:mm} | {entry.OperationType} | {entry.Outcome} | {mb} Mo");
             }
 
-            HistorySummary = entries.Count == 0
+            HistorySummary = HistoryItems.Count == 0
                 ? "Aucun historique disponible."
-                : $"Derniere operation: {entries[0].TimestampUtc.ToLocalTime():dd/MM/yyyy HH:mm}";
+                : $"{HistoryItems.Count} entrée(s) récente(s).";
         }
         catch (Exception ex)
         {
             loggerService.LogError("winui-history", "Failed to refresh history.", ex);
             HistorySummary = "Historique indisponible.";
+        }
+    }
+
+    private void ClearHistory()
+    {
+        try
+        {
+            historyService.Clear();
+            RefreshHistory();
+            StatusText = "Historique efface.";
+        }
+        catch (Exception ex)
+        {
+            loggerService.LogError("winui-history", "Failed to clear history.", ex);
+            StatusText = "Impossible d'effacer l'historique.";
+        }
+    }
+
+    private void OpenLogsFolder()
+    {
+        try
+        {
+            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string appFolder = Path.Combine(appDataPath, "Panosse");
+            Directory.CreateDirectory(appFolder);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = appFolder,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            loggerService.LogError("winui-logs", "Failed to open logs folder.", ex);
+            StatusText = "Impossible d'ouvrir le dossier de logs.";
         }
     }
 
@@ -741,7 +783,10 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
             double intervalMs = TimeSpan.FromHours(ScheduledCleanupIntervalHours).TotalMilliseconds;
             scheduledCleanupTimer = new System.Timers.Timer(intervalMs);
             scheduledCleanupTimer.AutoReset = true;
-            scheduledCleanupTimer.Elapsed += (_, _) => _ = ExecuteScheduledCleanupAsync();
+            scheduledCleanupTimer.Elapsed += (_, _) =>
+            {
+                RunOnUiThread(() => _ = ExecuteScheduledCleanupAsync());
+            };
             scheduledCleanupTimer.Start();
             SchedulerStatusText = $"Planifie toutes les {ScheduledCleanupIntervalHours}h.";
         }
@@ -750,6 +795,17 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
             loggerService.LogError("winui-scheduler", "Failed to configure scheduled cleanup.", ex);
             SchedulerStatusText = "Erreur de planification.";
         }
+    }
+
+    private void RunOnUiThread(Action action)
+    {
+        if (UiMarshal is not null)
+        {
+            UiMarshal(action);
+            return;
+        }
+
+        action();
     }
 
     private async Task ExecuteScheduledCleanupAsync()
@@ -778,26 +834,6 @@ public sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
         finally
         {
             scheduledCleanupLock.Release();
-        }
-    }
-
-    private void OpenLogsFolder()
-    {
-        try
-        {
-            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string appFolder = Path.Combine(appDataPath, "Panosse");
-            Directory.CreateDirectory(appFolder);
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = appFolder,
-                UseShellExecute = true
-            });
-        }
-        catch (Exception ex)
-        {
-            loggerService.LogError("winui-diagnostics", "Failed to open logs folder.", ex);
-            StatusText = "Impossible d'ouvrir le dossier de logs.";
         }
     }
 

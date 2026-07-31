@@ -28,6 +28,10 @@ namespace Panosse.WinUI.Views
         {
             ViewModel = App.GetRequiredService<ShellViewModel>();
             browserProcessService = App.GetRequiredService<IBrowserProcessService>();
+            ViewModel.UiMarshal = action =>
+            {
+                _ = DispatcherQueue.TryEnqueue(() => action());
+            };
             InitializeComponent();
             this.Loaded += MainPage_Loaded;
             this.KeyDown += MainPage_KeyDown;
@@ -41,6 +45,11 @@ namespace Panosse.WinUI.Views
             NavList.SelectedIndex = 0;
             UpdateMopAnimation();
             await CheckBrowsersAsync();
+
+            if (ViewModel.CheckUpdatesOnStartup)
+            {
+                _ = CheckForUpdatesAsync(showDialog: false);
+            }
         }
 
         private void MainPage_Unloaded(object sender, RoutedEventArgs e)
@@ -56,6 +65,32 @@ namespace Panosse.WinUI.Views
             if (e.PropertyName == nameof(ShellViewModel.IsBusy))
             {
                 UpdateMopAnimation();
+                if (!ViewModel.IsBusy && ViewModel.IsSuccessStatus)
+                {
+                    NotifyCleanupCompleted();
+                }
+            }
+        }
+
+        private void NotifyCleanupCompleted()
+        {
+            if (ViewModel.PlaySuccessSound)
+            {
+                _ = MessageBeep(MbIconAsterisk);
+            }
+
+            if (ViewModel.ShowTrayNotifications)
+            {
+                try
+                {
+                    App.GetRequiredService<ISystemTrayService>().ShowNotification(
+                        "Panosse",
+                        ViewModel.LastRunSummary);
+                }
+                catch
+                {
+                    // Notification optionnelle.
+                }
             }
         }
 
@@ -321,5 +356,10 @@ namespace Panosse.WinUI.Views
                 ViewModel.StatusText = "Impossible d'ouvrir GitHub.";
             }
         }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool MessageBeep(uint uType);
+
+        private const uint MbIconAsterisk = 0x00000040;
     }
 }

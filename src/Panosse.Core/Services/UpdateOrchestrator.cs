@@ -163,6 +163,8 @@ if errorlevel 1 (
     exit /b 1
 )
 powershell -NoProfile -ExecutionPolicy Bypass -File ""{registryScriptPath}"" >nul 2>&1
+if not exist ""%APPDATA%\Panosse"" mkdir ""%APPDATA%\Panosse"" >nul 2>&1
+echo success {displayVersion}> ""%APPDATA%\Panosse\last-update-result.txt""
 start """" ""{currentExePath}""
 if exist ""{currentExePath}.old"" del ""{currentExePath}.old""
 if exist ""{registryScriptPath}"" del ""{registryScriptPath}""
@@ -194,7 +196,13 @@ if exist ""{registryScriptPath}"" del ""{registryScriptPath}""
         };
 
         Process.Start(processInfo);
-        telemetryService.Increment("update_install_success_count");
+        telemetryService.Increment("update_install_script_launched_count");
+        historyService.AddEntry(new OperationHistoryEntry
+        {
+            OperationType = "update_install",
+            Outcome = "script_launched",
+            Details = scriptPath
+        });
         Environment.Exit(0);
     }
 
@@ -237,7 +245,7 @@ if exist ""{registryScriptPath}"" del ""{registryScriptPath}""
 
     private static string ResolveDisplayVersion(string? versionTag, string downloadedExePath)
     {
-        string? fromTag = NormalizeVersion(versionTag);
+        string? fromTag = UpdateVersion.Normalize(versionTag);
         if (!string.IsNullOrWhiteSpace(fromTag))
         {
             return fromTag;
@@ -248,7 +256,7 @@ if exist ""{registryScriptPath}"" del ""{registryScriptPath}""
             if (File.Exists(downloadedExePath))
             {
                 string? fileVersion = FileVersionInfo.GetVersionInfo(downloadedExePath).FileVersion;
-                string? normalized = NormalizeVersion(fileVersion);
+                string? normalized = UpdateVersion.Normalize(fileVersion);
                 if (!string.IsNullOrWhiteSpace(normalized))
                 {
                     return normalized;
@@ -261,24 +269,6 @@ if exist ""{registryScriptPath}"" del ""{registryScriptPath}""
         }
 
         return "unknown";
-    }
-
-    private static string? NormalizeVersion(string? version)
-    {
-        if (string.IsNullOrWhiteSpace(version) ||
-            version.Equals("latest", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        string trimmed = version.Trim().TrimStart('v', 'V');
-        string[] parts = trimmed.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (parts.Length >= 3)
-        {
-            return $"{parts[0]}.{parts[1]}.{parts[2]}";
-        }
-
-        return trimmed.Length > 0 ? trimmed : null;
     }
 
     private static string BuildRegistrySyncScript(string displayVersion, string currentExePath)
