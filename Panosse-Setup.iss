@@ -4,7 +4,7 @@
 
 #define MyAppName "Panosse"
 #ifndef MyAppVersion
-#define MyAppVersion "2.2.5"
+#define MyAppVersion "2.2.6"
 #endif
 #define MyAppPublisher "Marco Barbaro"
 #define MyAppURL "https://github.com/barbarom84-ai/panosse"

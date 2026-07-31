@@ -13,6 +13,11 @@ namespace Panosse.Services;
 
 public sealed class UpdateOrchestrator : IUpdateOrchestrator, IDisposable
 {
+    /// <summary>
+    /// Must match AppId in Panosse-Setup.iss (Inno writes {GUID}_is1 under Uninstall).
+    /// </summary>
+    private const string InnoUninstallKeyId = "{8E5F4A3B-2D1C-4E9F-A7B6-3C8D9E2F1A4B}_is1";
+
     private readonly HttpClient httpClient;
     private readonly ITelemetryService telemetryService;
     private readonly IOperationHistoryService historyService;
@@ -119,7 +124,16 @@ public sealed class UpdateOrchestrator : IUpdateOrchestrator, IDisposable
         ThrowIfDisposed();
         string tempDir = Path.GetTempPath();
         string scriptPath = Path.Combine(tempDir, "PanosseUpdate.bat");
+        string registryScriptPath = Path.Combine(tempDir, "PanosseUpdateRegistry.ps1");
         bool requiresElevation = RequiresElevation(currentExePath);
+        string displayVersion = ResolveDisplayVersion(versionTag, downloadedExePath);
+
+        string registryScript = BuildRegistrySyncScript(displayVersion, currentExePath);
+        await File.WriteAllTextAsync(
+            registryScriptPath,
+            registryScript,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            cancellationToken);
 
         string scriptContent = $@"@echo off
 chcp 65001 >nul
@@ -148,13 +162,17 @@ if errorlevel 1 (
     move /Y ""{currentExePath}.old"" ""{currentExePath}"" >nul 2>&1
     exit /b 1
 )
+powershell -NoProfile -ExecutionPolicy Bypass -File ""{registryScriptPath}"" >nul 2>&1
 start """" ""{currentExePath}""
 if exist ""{currentExePath}.old"" del ""{currentExePath}.old""
+if exist ""{registryScriptPath}"" del ""{registryScriptPath}""
 (goto) 2>nul & del ""%~f0""";
 
         await File.WriteAllTextAsync(scriptPath, scriptContent, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), cancellationToken);
         telemetryService.Increment("update_install_script_generated_count");
-        logger.LogInfo("update", $"Install script generated for {versionTag ?? "latest"} (elevation={(requiresElevation ? "yes" : "no")}).");
+        logger.LogInfo(
+            "update",
+            $"Install script generated for {displayVersion} (elevation={(requiresElevation ? "yes" : "no")}).");
 
         return new UpdateInstallResult
         {
@@ -215,6 +233,97 @@ if exist ""{currentExePath}.old"" del ""{currentExePath}.old""
         using FileStream stream = File.OpenRead(filePath);
         byte[] hash = sha256.ComputeHash(stream);
         return Convert.ToHexString(hash);
+    }
+
+    private static string ResolveDisplayVersion(string? versionTag, string downloadedExePath)
+    {
+        string? fromTag = NormalizeVersion(versionTag);
+        if (!string.IsNullOrWhiteSpace(fromTag))
+        {
+            return fromTag;
+        }
+
+        try
+        {
+            if (File.Exists(downloadedExePath))
+            {
+                string? fileVersion = FileVersionInfo.GetVersionInfo(downloadedExePath).FileVersion;
+                string? normalized = NormalizeVersion(fileVersion);
+                if (!string.IsNullOrWhiteSpace(normalized))
+                {
+                    return normalized;
+                }
+            }
+        }
+        catch
+        {
+            // Best effort only.
+        }
+
+        return "unknown";
+    }
+
+    private static string? NormalizeVersion(string? version)
+    {
+        if (string.IsNullOrWhiteSpace(version) ||
+            version.Equals("latest", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        string trimmed = version.Trim().TrimStart('v', 'V');
+        string[] parts = trimmed.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length >= 3)
+        {
+            return $"{parts[0]}.{parts[1]}.{parts[2]}";
+        }
+
+        return trimmed.Length > 0 ? trimmed : null;
+    }
+
+    private static string BuildRegistrySyncScript(string displayVersion, string currentExePath)
+    {
+        // Keep the script ASCII-simple: update Inno uninstall metadata so
+        // "Programmes et fonctionnalités" matches the replaced binary.
+        string escapedExe = currentExePath.Replace("'", "''", StringComparison.Ordinal);
+        return $$$"""
+$ErrorActionPreference = 'SilentlyContinue'
+$version = '{{{displayVersion}}}'
+$displayName = "Panosse $version"
+$exePath = '{{{escapedExe}}}'
+$keys = @(
+  'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{{{InnoUninstallKeyId}}}',
+  'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{{{InnoUninstallKeyId}}}'
+)
+
+function Update-PanosseUninstallKey([string]$keyPath) {
+  if (-not (Test-Path -LiteralPath $keyPath)) { return }
+  Set-ItemProperty -LiteralPath $keyPath -Name 'DisplayVersion' -Value $version -Type String -Force
+  Set-ItemProperty -LiteralPath $keyPath -Name 'DisplayName' -Value $displayName -Type String -Force
+  if (Test-Path -LiteralPath $exePath) {
+    $sizeKb = [int][math]::Round((Get-Item -LiteralPath $exePath).Length / 1KB)
+    if ($sizeKb -gt 0) {
+      Set-ItemProperty -LiteralPath $keyPath -Name 'EstimatedSize' -Value $sizeKb -Type DWord -Force
+    }
+  }
+}
+
+foreach ($key in $keys) { Update-PanosseUninstallKey $key }
+
+$roots = @(
+  'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+  'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+)
+foreach ($root in $roots) {
+  if (-not (Test-Path -LiteralPath $root)) { continue }
+  Get-ChildItem -LiteralPath $root | ForEach-Object {
+    $props = Get-ItemProperty -LiteralPath $_.PSPath
+    if ($null -ne $props.DisplayName -and $props.DisplayName -like 'Panosse*') {
+      Update-PanosseUninstallKey $_.PSPath
+    }
+  }
+}
+""";
     }
 
     private static bool RequiresElevation(string exePath)
