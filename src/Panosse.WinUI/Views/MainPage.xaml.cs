@@ -32,6 +32,7 @@ namespace Panosse.WinUI.Views
             {
                 _ = DispatcherQueue.TryEnqueue(() => action());
             };
+            ViewModel.ConfirmCleanupAsync = ConfirmCleanupAsync;
             InitializeComponent();
             this.Loaded += MainPage_Loaded;
             this.KeyDown += MainPage_KeyDown;
@@ -176,6 +177,27 @@ namespace Panosse.WinUI.Views
             }
         }
 
+        private async Task<bool> ConfirmCleanupAsync(string message)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "Confirmer le nettoyage",
+                Content = new TextBlock
+                {
+                    Text = message,
+                    TextWrapping = TextWrapping.WrapWholeWords,
+                    MaxWidth = 420
+                },
+                PrimaryButtonText = "Nettoyer",
+                CloseButtonText = "Annuler",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = XamlRoot
+            };
+
+            ContentDialogResult result = await dialog.ShowAsync();
+            return result == ContentDialogResult.Primary;
+        }
+
         private async void BrowserWarningLink_Click(object sender, RoutedEventArgs e)
         {
             if (isClosingBrowsers || navigateursEnCours.Count == 0)
@@ -201,19 +223,19 @@ namespace Panosse.WinUI.Views
 
                 if (result.AllClosed || navigateursEnCours.Count == 0)
                 {
-                    ViewModel.StatusText = "Navigateurs fermes. Nettoyage complet possible.";
+                    ViewModel.StatusText = "Navigateurs fermés. Nettoyage complet possible.";
                 }
                 else
                 {
                     string remaining = string.Join(" et ", result.RemainingBrowsers);
-                    ViewModel.StatusText = $"{remaining} reste ouvert. Fermez-le manuellement puis reessayez.";
+                    ViewModel.StatusText = $"{remaining} reste ouvert. Fermez-le manuellement puis réessayez.";
                 }
             }
             catch (OperationCanceledException)
             {
                 await CheckBrowsersAsync();
                 ViewModel.StatusText = navigateursEnCours.Count == 0
-                    ? "Navigateurs fermes. Nettoyage complet possible."
+                    ? "Navigateurs fermés. Nettoyage complet possible."
                     : "Fermeture interrompue. Fermez les navigateurs manuellement.";
             }
             catch
@@ -230,9 +252,9 @@ namespace Panosse.WinUI.Views
 
         public void TriggerCleanupFromTray()
         {
-            if (ViewModel.RunCleanupCommand.CanExecute(null))
+            if (!ViewModel.IsBusy)
             {
-                ViewModel.RunCleanupCommand.Execute(null);
+                _ = ViewModel.RunCleanupFromTrayAsync();
             }
         }
 
@@ -247,11 +269,11 @@ namespace Panosse.WinUI.Views
         {
             if (!ViewModel.CheckUpdatesCommand.CanExecute(null))
             {
-                ViewModel.StatusText = "Verification deja en cours...";
+                ViewModel.StatusText = "Vérification déjà en cours...";
                 return;
             }
 
-            ViewModel.StatusText = "Verification des mises a jour en cours...";
+            ViewModel.StatusText = "Vérification des mises à jour en cours...";
             ViewModel.CheckUpdatesCommand.Execute(null);
 
             int guard = 0;
@@ -262,7 +284,7 @@ namespace Panosse.WinUI.Views
             }
 
             string result = string.IsNullOrWhiteSpace(ViewModel.UpdateStatusText)
-                ? "Verification terminee."
+                ? "Vérification terminée."
                 : ViewModel.UpdateStatusText;
             ViewModel.StatusText = result;
 
@@ -273,7 +295,7 @@ namespace Panosse.WinUI.Views
 
             var dialog = new ContentDialog
             {
-                Title = "Mises a jour",
+                Title = "Mises à jour",
                 Content = result,
                 CloseButtonText = ViewModel.IsUpdateAvailable ? "Plus tard" : "OK",
                 XamlRoot = this.XamlRoot
@@ -281,7 +303,7 @@ namespace Panosse.WinUI.Views
 
             if (ViewModel.IsUpdateAvailable)
             {
-                dialog.PrimaryButtonText = "Telecharger";
+                dialog.PrimaryButtonText = "Télécharger";
             }
 
             ContentDialogResult dialogResult = await dialog.ShowAsync();
@@ -311,7 +333,7 @@ namespace Panosse.WinUI.Views
             {
                 var errorDialog = new ContentDialog
                 {
-                    Title = "Mise a jour",
+                    Title = "Mise à jour",
                     Content = ViewModel.UpdateStatusText,
                     CloseButtonText = "OK",
                     XamlRoot = this.XamlRoot

@@ -18,15 +18,15 @@ namespace Panosse.Core.ViewModels;
 
 public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
 {
-    private string statusText = "Pret";
+    private string statusText = "Prêt";
     private string buttonText = "Passer la panosse";
     private double progressValue;
     private bool isBusy;
     private bool previewModeEnabled;
     private string exclusionPatterns = string.Empty;
-    private string lastRunSummary = "Aucun nettoyage execute.";
+    private string lastRunSummary = "Aucun nettoyage exécuté.";
     private string historySummary = "Aucun historique disponible.";
-    private string updateStatusText = "Mise a jour non verifiee.";
+    private string updateStatusText = "Mise à jour non vérifiée.";
     private double updateProgressValue;
     private bool isUpdateAvailable;
     private bool isCheckingUpdate;
@@ -56,6 +56,8 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     private string schedulerStatusText = "Planification inactive.";
     private const int MaxVisibleTaskMessages = 6;
     private bool isSuccessStatus;
+    private bool hasPreviewResults;
+    private string previewRiskSummary = string.Empty;
     private System.Timers.Timer? scheduledCleanupTimer;
     private readonly SemaphoreSlim scheduledCleanupLock = new(1, 1);
     private bool disposed;
@@ -73,6 +75,11 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     /// </summary>
     public Action<Action>? UiMarshal { get; set; }
 
+    /// <summary>
+    /// Optional confirmation before a destructive cleanup. Return false to cancel.
+    /// </summary>
+    public Func<string, Task<bool>>? ConfirmCleanupAsync { get; set; }
+
     public ShellViewModel(
         ICleanupOrchestrator cleanupOrchestrator,
         ILoggerService loggerService,
@@ -89,13 +96,22 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         this.updateOrchestrator = updateOrchestrator;
 
         RunCleanupCommand = new AsyncRelayCommand(
-            executeAsync: ExecuteCleanupAsync,
+            executeAsync: () => ExecuteCleanupAsync(previewOnly: false),
             canExecute: () => !IsBusy,
             onException: ex => loggerService.LogError("winui-cleanup", "Cleanup command failed.", ex));
+        RunPreviewCommand = new AsyncRelayCommand(
+            executeAsync: () => ExecuteCleanupAsync(previewOnly: true),
+            canExecute: () => !IsBusy,
+            onException: ex => loggerService.LogError("winui-cleanup", "Preview command failed.", ex));
+        ConfirmCleanupFromPreviewCommand = new AsyncRelayCommand(
+            executeAsync: () => ExecuteCleanupAsync(previewOnly: false, fromPreview: true),
+            canExecute: () => !IsBusy && HasPreviewResults,
+            onException: ex => loggerService.LogError("winui-cleanup", "Confirm cleanup failed.", ex));
 
         SaveSettingsCommand = new RelayCommand(SaveSettings);
         RefreshHistoryCommand = new RelayCommand(RefreshHistory);
         ClearHistoryCommand = new RelayCommand(ClearHistory);
+        ExportHistoryCommand = new RelayCommand(ExportHistory);
         CheckUpdatesCommand = new AsyncRelayCommand(
             executeAsync: ExecuteCheckUpdatesAsync,
             canExecute: () => !IsCheckingUpdate && !IsPreparingUpdate,
@@ -120,11 +136,15 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
 
     public ObservableCollection<string> TaskMessages { get; } = new();
     public ObservableCollection<string> HistoryItems { get; } = new();
+    public ObservableCollection<string> PreviewItems { get; } = new();
 
     public ICommand RunCleanupCommand { get; }
+    public ICommand RunPreviewCommand { get; }
+    public ICommand ConfirmCleanupFromPreviewCommand { get; }
     public ICommand SaveSettingsCommand { get; }
     public ICommand RefreshHistoryCommand { get; }
     public ICommand ClearHistoryCommand { get; }
+    public ICommand ExportHistoryCommand { get; }
     public ICommand CheckUpdatesCommand { get; }
     public ICommand PrepareUpdateCommand { get; }
     public ICommand InstallPreparedUpdateCommand { get; }
@@ -162,6 +182,8 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             if (SetField(ref isBusy, value))
             {
                 (RunCleanupCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (RunPreviewCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (ConfirmCleanupFromPreviewCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsProgressVisible)));
             }
         }
@@ -170,6 +192,24 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     public bool IsProgressVisible => IsBusy || ProgressValue > 0;
 
     public bool HasTaskMessages => TaskMessages.Count > 0;
+
+    public bool HasPreviewResults
+    {
+        get => hasPreviewResults;
+        private set
+        {
+            if (SetField(ref hasPreviewResults, value))
+            {
+                (ConfirmCleanupFromPreviewCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string PreviewRiskSummary
+    {
+        get => previewRiskSummary;
+        private set => SetField(ref previewRiskSummary, value);
+    }
 
     public bool IsSuccessStatus
     {
@@ -278,7 +318,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
 
     public bool IsUpdateProgressVisible => IsPreparingUpdate;
 
-    public string UpdateHeaderText => IsUpdateAvailable ? "Mises a jour - Nouveau" : "Mises a jour";
+    public string UpdateHeaderText => IsUpdateAvailable ? "Mises à jour - Nouveau" : "Mises à jour";
 
     public bool IsUpdatesExpanded
     {
@@ -293,13 +333,13 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    public string TaskMessagesHeaderText => $"Messages de tache ({TaskMessages.Count})";
+    public string TaskMessagesHeaderText => $"Messages de tâche ({TaskMessages.Count})";
 
-    public string HistoryItemsHeaderText => $"Historique recent ({HistoryItems.Count})";
+    public string HistoryItemsHeaderText => $"Historique récent ({HistoryItems.Count})";
 
-    public string TaskMessagesEmptyText => TaskMessages.Count == 0 ? "Aucun message de tache." : string.Empty;
+    public string TaskMessagesEmptyText => TaskMessages.Count == 0 ? "Aucun message de tâche." : string.Empty;
 
-    public string HistoryItemsEmptyText => HistoryItems.Count == 0 ? "Aucun element d'historique." : string.Empty;
+    public string HistoryItemsEmptyText => HistoryItems.Count == 0 ? "Aucun élément d'historique." : string.Empty;
 
     public bool IsTaskMessagesExpanded
     {
@@ -407,19 +447,44 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         set => SetField(ref schedulerStatusText, value);
     }
 
-    private async Task ExecuteCleanupAsync()
+    public Task RunCleanupFromTrayAsync() =>
+        ExecuteCleanupAsync(previewOnly: false, requireConfirmation: false);
+
+    private async Task ExecuteCleanupAsync(bool previewOnly, bool fromPreview = false, bool requireConfirmation = true)
     {
+        bool preview = fromPreview
+            ? false
+            : previewOnly || PreviewModeEnabled;
+        if (!preview && requireConfirmation && ConfirmCleanupAsync is not null)
+        {
+            string confirmMessage = fromPreview && HasPreviewResults
+                ? BuildCleanupConfirmMessage()
+                : "Lancer le nettoyage des fichiers temporaires, caches et téléchargements anciens ?";
+
+            if (!await ConfirmCleanupAsync(confirmMessage))
+            {
+                StatusText = "Nettoyage annulé.";
+                return;
+            }
+        }
+
         IsBusy = true;
         Stopwatch cleanupStopwatch = Stopwatch.StartNew();
         IsSuccessStatus = false;
-        ButtonText = PreviewModeEnabled ? "Previsualisation..." : "Nettoyage...";
-        StatusText = "Preparation...";
+        ButtonText = preview ? "Prévisualisation..." : "Nettoyage...";
+        StatusText = "Préparation...";
         ProgressValue = 0;
         TaskMessages.Clear();
+        if (preview)
+        {
+            PreviewItems.Clear();
+            HasPreviewResults = false;
+            PreviewRiskSummary = string.Empty;
+        }
 
         var options = new CleanupExecutionOptions
         {
-            PreviewOnly = PreviewModeEnabled,
+            PreviewOnly = preview,
             ExclusionPatterns = GetExclusions()
         };
 
@@ -444,11 +509,23 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             await EnsureMinimumCleanupDurationAsync(cleanupStopwatch);
 
             double totalMb = Math.Round(totalFreedBytes / 1024.0 / 1024.0, 2);
-            LastRunSummary = PreviewModeEnabled
-                ? $"Previsualisation terminee: {totalMb} Mo estimes."
-                : $"Nettoyage termine: {totalMb} Mo liberes.";
+            LastRunSummary = preview
+                ? $"Prévisualisation terminée : {totalMb} Mo estimés."
+                : $"Nettoyage terminé : {totalMb} Mo libérés.";
             StatusText = LastRunSummary;
             IsSuccessStatus = true;
+
+            if (preview)
+            {
+                PopulatePreviewResults(totalMb);
+            }
+            else
+            {
+                PreviewItems.Clear();
+                HasPreviewResults = false;
+                PreviewRiskSummary = string.Empty;
+            }
+
             RefreshHistory();
         }
         catch (Exception ex)
@@ -456,7 +533,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             await EnsureMinimumCleanupDurationAsync(cleanupStopwatch);
 
             IsSuccessStatus = false;
-            StatusText = $"Erreur: {ex.Message}";
+            StatusText = $"Erreur : {ex.Message}";
             AddTaskMessage(StatusText);
             loggerService.LogError("winui-cleanup", "Cleanup execution failed.", ex);
         }
@@ -466,6 +543,64 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             ButtonText = "Passer la panosse";
         }
     }
+
+    private string BuildCleanupConfirmMessage()
+    {
+        var lines = new List<string>
+        {
+            "Confirmer le nettoyage avec les estimations actuelles ?"
+        };
+
+        if (!string.IsNullOrWhiteSpace(PreviewRiskSummary))
+        {
+            lines.Add(PreviewRiskSummary);
+        }
+
+        foreach (string item in PreviewItems.Take(5))
+        {
+            lines.Add("• " + item);
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private void PopulatePreviewResults(double totalMb)
+    {
+        PreviewItems.Clear();
+        IReadOnlyList<CleanupPreviewItem> items = cleanupOrchestrator.GetPreviewBreakdown(GetExclusions());
+        bool hasMediumRisk = false;
+
+        foreach (CleanupPreviewItem item in items.Where(i => i.EstimatedBytes > 0).OrderByDescending(i => i.EstimatedBytes))
+        {
+            double mb = Math.Round(item.EstimatedBytes / 1024.0 / 1024.0, 2);
+            string risk = FormatRiskLevel(item.RiskLevel);
+            if (string.Equals(item.RiskLevel, "Medium", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(item.RiskLevel, "High", StringComparison.OrdinalIgnoreCase))
+            {
+                hasMediumRisk = true;
+            }
+
+            PreviewItems.Add($"{item.Category} : {mb} Mo · risque {risk}");
+        }
+
+        if (PreviewItems.Count == 0)
+        {
+            PreviewItems.Add($"Total estimé : {totalMb} Mo");
+        }
+
+        HasPreviewResults = PreviewItems.Count > 0;
+        PreviewRiskSummary = hasMediumRisk
+            ? "Attention : certaines catégories (ex. téléchargements) ont un risque moyen."
+            : "Risque faible pour les catégories listées.";
+    }
+
+    private static string FormatRiskLevel(string riskLevel) =>
+        riskLevel?.Trim().ToLowerInvariant() switch
+        {
+            "high" => "élevé",
+            "medium" => "moyen",
+            _ => "faible"
+        };
 
     private static async Task EnsureMinimumCleanupDurationAsync(Stopwatch cleanupStopwatch)
     {
@@ -558,7 +693,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             ConfigureScheduledCleanup();
             if (showStatus)
             {
-                StatusText = "Parametres sauvegardes.";
+                StatusText = "Paramètres sauvegardés.";
             }
         }
         catch (Exception ex)
@@ -566,7 +701,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             loggerService.LogError("winui-settings", "Failed to save settings.", ex);
             if (showStatus)
             {
-                StatusText = "Erreur de sauvegarde des parametres.";
+                StatusText = "Erreur de sauvegarde des paramètres.";
             }
         }
     }
@@ -575,12 +710,11 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     {
         try
         {
-            IReadOnlyList<OperationHistoryEntry> entries = historyService.GetRecentEntries(8);
+            IReadOnlyList<OperationHistoryEntry> entries = historyService.GetRecentEntries(12);
             HistoryItems.Clear();
             foreach (OperationHistoryEntry entry in entries)
             {
-                double mb = Math.Round(entry.FreedBytes / 1024.0 / 1024.0, 2);
-                HistoryItems.Add($"{entry.TimestampUtc.ToLocalTime():dd/MM HH:mm} | {entry.OperationType} | {entry.Outcome} | {mb} Mo");
+                HistoryItems.Add(FormatHistoryLine(entry));
             }
 
             HistorySummary = HistoryItems.Count == 0
@@ -594,18 +728,78 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
+    internal static string FormatHistoryLine(OperationHistoryEntry entry)
+    {
+        double mb = Math.Round(entry.FreedBytes / 1024.0 / 1024.0, 2);
+        string type = FormatOperationType(entry.OperationType);
+        string outcome = FormatOutcome(entry.Outcome);
+        string line = $"{entry.TimestampUtc.ToLocalTime():dd/MM HH:mm} · {type} · {outcome} · {mb} Mo";
+        if (!string.IsNullOrWhiteSpace(entry.Details) &&
+            !string.Equals(entry.Outcome, "success", StringComparison.OrdinalIgnoreCase))
+        {
+            line += $" — {entry.Details}";
+        }
+
+        return line;
+    }
+
+    private static string FormatOperationType(string operationType) =>
+        operationType?.Trim().ToLowerInvariant() switch
+        {
+            "cleanup_preview" => "Aperçu",
+            "cleanup_manual" => "Nettoyage",
+            "cleanup_scheduled" => "Planifié",
+            "update" => "Mise à jour",
+            _ => string.IsNullOrWhiteSpace(operationType) ? "Opération" : operationType
+        };
+
+    private static string FormatOutcome(string outcome) =>
+        outcome?.Trim().ToLowerInvariant() switch
+        {
+            "success" => "Succès",
+            "failure" => "Échec",
+            "cancelled" => "Annulé",
+            _ => string.IsNullOrWhiteSpace(outcome) ? "—" : outcome
+        };
+
     private void ClearHistory()
     {
         try
         {
             historyService.Clear();
             RefreshHistory();
-            StatusText = "Historique efface.";
+            StatusText = "Historique effacé.";
         }
         catch (Exception ex)
         {
             loggerService.LogError("winui-history", "Failed to clear history.", ex);
             StatusText = "Impossible d'effacer l'historique.";
+        }
+    }
+
+    private void ExportHistory()
+    {
+        try
+        {
+            string path = historyService.ExportToCsv();
+            StatusText = $"Historique exporté : {path}";
+            try
+            {
+                _ = Process.Start(new ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true
+                });
+            }
+            catch
+            {
+                // Opening the file is optional.
+            }
+        }
+        catch (Exception ex)
+        {
+            loggerService.LogError("winui-history", "Failed to export history.", ex);
+            StatusText = "Impossible d'exporter l'historique.";
         }
     }
 
@@ -638,7 +832,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         updateExpectedSha256 = null;
         preparedScriptPath = null;
         NotifyInstallReadyChanged();
-        UpdateStatusText = "Verification des mises a jour...";
+        UpdateStatusText = "Vérification des mises à jour...";
         UpdateProgressValue = 0;
 
         try
@@ -647,13 +841,13 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             UpdateCheckResult result = await updateService.CheckForUpdateAsync(GithubRepo, currentVersion);
             if (result.VerificationFailed)
             {
-                UpdateStatusText = "Verification impossible. Verifiez votre connexion.";
+                UpdateStatusText = "Vérification impossible. Vérifiez votre connexion.";
                 return;
             }
 
             if (!result.HasUpdate || result.ReleaseInfo == null)
             {
-                UpdateStatusText = "Application deja a jour.";
+                UpdateStatusText = "Application déjà à jour.";
                 return;
             }
 
@@ -670,14 +864,14 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             }
 
             UpdateStatusText = IsUpdateAvailable
-                ? $"Mise a jour disponible: {updateTagName}"
+                ? $"Mise à jour disponible : {updateTagName}"
                 : string.IsNullOrWhiteSpace(updateDownloadUrl)
-                    ? $"Mise a jour detectee ({updateTagName}) sans binaire .exe."
-                    : $"Mise a jour detectee ({updateTagName}) sans checksum SHA256.";
+                    ? $"Mise à jour détectée ({updateTagName}) sans binaire .exe."
+                    : $"Mise à jour détectée ({updateTagName}) sans checksum SHA256.";
         }
         catch (Exception ex)
         {
-            UpdateStatusText = $"Erreur update: {ex.Message}";
+            UpdateStatusText = $"Erreur mise à jour : {ex.Message}";
             loggerService.LogError("winui-update", "Update check exception.", ex);
         }
         finally
@@ -690,26 +884,26 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     {
         if (string.IsNullOrWhiteSpace(updateDownloadUrl))
         {
-            UpdateStatusText = "Aucun lien de telechargement disponible.";
+            UpdateStatusText = "Aucun lien de téléchargement disponible.";
             return;
         }
 
         if (string.IsNullOrWhiteSpace(updateExpectedSha256))
         {
-            UpdateStatusText = "Checksum SHA256 indisponible pour cette mise a jour.";
+            UpdateStatusText = "Checksum SHA256 indisponible pour cette mise à jour.";
             return;
         }
 
         string currentExePath = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
         if (string.IsNullOrWhiteSpace(currentExePath))
         {
-            UpdateStatusText = "Impossible de determiner le chemin de l'application.";
+            UpdateStatusText = "Impossible de déterminer le chemin de l'application.";
             return;
         }
 
         IsPreparingUpdate = true;
         UpdateProgressValue = 0;
-        UpdateStatusText = "Preparation de la mise a jour...";
+        UpdateStatusText = "Préparation de la mise à jour...";
         preparedScriptPath = null;
 
         try
@@ -731,18 +925,18 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             if (!result.Success || string.IsNullOrWhiteSpace(result.ScriptPath))
             {
                 UpdateStatusText = string.IsNullOrWhiteSpace(result.ErrorMessage)
-                    ? "Preparation de la mise a jour echouee."
+                    ? "Préparation de la mise à jour échouée."
                     : result.ErrorMessage;
                 return;
             }
 
             preparedScriptPath = result.ScriptPath;
-            UpdateStatusText = "Mise a jour preparee. Cliquez sur Installer.";
+            UpdateStatusText = "Mise à jour préparée. Cliquez sur Installer.";
             NotifyInstallReadyChanged();
         }
         catch (Exception ex)
         {
-            UpdateStatusText = $"Erreur preparation update: {ex.Message}";
+            UpdateStatusText = $"Erreur préparation mise à jour : {ex.Message}";
             loggerService.LogError("winui-update", "Update preparation exception.", ex);
         }
         finally
@@ -755,7 +949,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     {
         if (string.IsNullOrWhiteSpace(preparedScriptPath))
         {
-            UpdateStatusText = "Aucun script de mise a jour prepare.";
+            UpdateStatusText = "Aucun script de mise à jour préparé.";
             return;
         }
 
@@ -788,7 +982,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
                 RunOnUiThread(() => _ = ExecuteScheduledCleanupAsync());
             };
             scheduledCleanupTimer.Start();
-            SchedulerStatusText = $"Planifie toutes les {ScheduledCleanupIntervalHours}h.";
+            SchedulerStatusText = $"Planifié toutes les {ScheduledCleanupIntervalHours}h.";
         }
         catch (Exception ex)
         {
@@ -822,14 +1016,14 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
                 return;
             }
 
-            StatusText = "Nettoyage planifie en cours...";
-            await ExecuteCleanupAsync();
-            SchedulerStatusText = $"Dernier run planifie: {DateTime.Now:dd/MM HH:mm}";
+            StatusText = "Nettoyage planifié en cours...";
+            await ExecuteCleanupAsync(previewOnly: false, requireConfirmation: false);
+            SchedulerStatusText = $"Dernier run planifié : {DateTime.Now:dd/MM HH:mm}";
         }
         catch (Exception ex)
         {
             loggerService.LogError("winui-scheduler", "Scheduled cleanup failed.", ex);
-            SchedulerStatusText = "Echec du run planifie.";
+            SchedulerStatusText = "Échec du run planifié.";
         }
         finally
         {

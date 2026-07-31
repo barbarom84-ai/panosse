@@ -27,3 +27,26 @@ public class ExclusionMatchingTests
         Assert.False(CleanupOrchestrator.IsExcluded(@"C:\Downloads\Other.exe", Array.Empty<string>()));
     }
 }
+
+public class HistoryFormattingTests
+{
+    [Fact]
+    public void FormatHistoryLine_IncludesFrenchOutcomeAndFailureDetails()
+    {
+        var entry = new OperationHistoryEntry
+        {
+            TimestampUtc = new DateTime(2026, 7, 31, 10, 15, 0, DateTimeKind.Utc),
+            OperationType = "cleanup_manual",
+            Outcome = "failure",
+            FreedBytes = 5 * 1024 * 1024,
+            Details = "access denied"
+        };
+
+        string line = Panosse.Core.ViewModels.ShellViewModel.FormatHistoryLine(entry);
+
+        Assert.Contains("Nettoyage", line);
+        Assert.Contains("Échec", line);
+        Assert.Contains("access denied", line);
+        Assert.Contains("5", line);
+    }
+}

@@ -171,10 +171,15 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
 
         if (result.IsPreview)
         {
-            result.PreviewItems = BuildPreviewItems(options?.ExclusionPatterns ?? new List<string>());
+            result.PreviewItems = GetPreviewBreakdown(options?.ExclusionPatterns).ToList();
         }
 
         return result;
+    }
+
+    public IReadOnlyList<CleanupPreviewItem> GetPreviewBreakdown(IReadOnlyList<string>? exclusionPatterns = null)
+    {
+        return BuildPreviewItems(exclusionPatterns?.ToList() ?? new List<string>());
     }
 
     private static Task<long> RunOrEstimateAsync(bool preview, Func<long> execute, long estimated)
@@ -194,30 +199,55 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
         string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         string downloadsPath = Path.Combine(userProfile, "Downloads");
         string tempPath = Path.GetTempPath();
+        string windowsTemp = @"C:\Windows\Temp";
         string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         string chromeCache = Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Cache");
+        string edgeCache = Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Cache");
+        string firefoxProfiles = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            @"Mozilla\Firefox\Profiles");
+        string thumbnails = Path.Combine(localAppData, @"Microsoft\Windows\Explorer");
+        string logsPath = @"C:\Windows\Logs";
+
+        long browserBytes = EstimateDirectoryBytes(chromeCache)
+            + EstimateDirectoryBytes(edgeCache)
+            + EstimateFirefoxCacheBytes(firefoxProfiles);
 
         return new List<CleanupPreviewItem>
         {
             new()
             {
-                Category = "Temporary files",
+                Category = "Fichiers temporaires",
                 Location = tempPath,
-                EstimatedBytes = EstimateDirectoryBytes(tempPath),
+                EstimatedBytes = EstimateDirectoryBytes(tempPath) + EstimateDirectoryBytes(windowsTemp),
                 RiskLevel = "Low"
             },
             new()
             {
-                Category = "Old downloads",
+                Category = "Caches navigateurs",
+                Location = localAppData,
+                EstimatedBytes = browserBytes,
+                RiskLevel = "Low"
+            },
+            new()
+            {
+                Category = "Téléchargements anciens",
                 Location = downloadsPath,
                 EstimatedBytes = EstimateOldDownloads(exclusionPatterns),
                 RiskLevel = "Medium"
             },
             new()
             {
-                Category = "Browser cache",
-                Location = chromeCache,
-                EstimatedBytes = EstimateDirectoryBytes(chromeCache),
+                Category = "Logs Windows",
+                Location = logsPath,
+                EstimatedBytes = EstimateDirectoryBytes(logsPath),
+                RiskLevel = "Low"
+            },
+            new()
+            {
+                Category = "Cache miniatures",
+                Location = thumbnails,
+                EstimatedBytes = EstimateThumbnailBytes(thumbnails),
                 RiskLevel = "Low"
             }
         };

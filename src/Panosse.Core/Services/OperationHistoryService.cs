@@ -66,6 +66,58 @@ public sealed class OperationHistoryService : IOperationHistoryService
         }
     }
 
+    public string ExportToCsv(int maxEntries = 100)
+    {
+        List<OperationHistoryEntry> entries;
+        lock (syncRoot)
+        {
+            entries = LoadNoThrow()
+                .OrderByDescending(e => e.TimestampUtc)
+                .Take(Math.Max(1, maxEntries))
+                .ToList();
+        }
+
+        string? directory = Path.GetDirectoryName(historyPath);
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            throw new InvalidOperationException("Impossible de déterminer le dossier d'historique.");
+        }
+
+        Directory.CreateDirectory(directory);
+        string exportPath = Path.Combine(directory, $"history-export-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
+
+        var lines = new List<string>
+        {
+            "TimestampLocal,OperationType,Outcome,FreedMb,DurationMs,Details"
+        };
+
+        foreach (OperationHistoryEntry entry in entries)
+        {
+            double mb = Math.Round(entry.FreedBytes / 1024.0 / 1024.0, 2);
+            lines.Add(string.Join(',',
+                Csv(entry.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")),
+                Csv(entry.OperationType),
+                Csv(entry.Outcome),
+                Csv(mb.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                Csv(entry.DurationMs.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                Csv(entry.Details)));
+        }
+
+        File.WriteAllLines(exportPath, lines);
+        return exportPath;
+    }
+
+    private static string Csv(string? value)
+    {
+        string raw = value ?? string.Empty;
+        if (raw.Contains('"') || raw.Contains(',') || raw.Contains('\n') || raw.Contains('\r'))
+        {
+            return $"\"{raw.Replace("\"", "\"\"")}\"";
+        }
+
+        return raw;
+    }
+
     private List<OperationHistoryEntry> LoadNoThrow()
     {
         try

@@ -1,9 +1,28 @@
 # Sync Windows Uninstall DisplayVersion/DisplayName for Panosse (requires admin).
 param(
-    [string]$Version = "2.2.7"
+    [string]$Version = "2.2.8"
 )
 
 $ErrorActionPreference = 'Stop'
+
+function Test-IsAdmin {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+if (-not (Test-IsAdmin)) {
+    Write-Host "Elevation admin requise (UAC)..." -ForegroundColor Yellow
+    $scriptPath = $MyInvocation.MyCommand.Path
+    Start-Process -FilePath "powershell.exe" -Verb RunAs -Wait -ArgumentList @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "`"$scriptPath`"",
+        "-Version", $Version
+    )
+    exit $LASTEXITCODE
+}
+
 $displayName = "Panosse $Version"
 $id = '{8E5F4A3B-2D1C-4E9F-A7B6-3C8D9E2F1A4B}_is1'
 $keys = @(

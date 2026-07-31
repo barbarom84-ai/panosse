@@ -274,6 +274,10 @@
                                         </Ellipse.RenderTransform>
                                     </Ellipse>
                                 </Button>
+                                <HyperlinkButton Content="Aperçu du nettoyage"
+                                                 Command="{x:Bind ViewModel.RunPreviewCommand}"
+                                                 HorizontalAlignment="Center"
+                                                 FontSize="13" />
                             </StackPanel>
 
                             <!-- Avertissement Navigateurs -->
@@ -293,11 +297,47 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- Carte aperçu (estimations par catégorie) -->
+                    <Border x:Name="PreviewCard"
+                            Style="{StaticResource CardBorderStyle}"
+                            Padding="24,16"
+                            VerticalAlignment="Top"
+                            x:Load="{x:Bind ViewModel.HasPreviewResults, Mode=OneWay}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Aperçu"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource AppTextColor}" />
+                            <TextBlock Text="{x:Bind ViewModel.PreviewRiskSummary, Mode=OneWay}"
+                                       FontSize="12"
+                                       Foreground="{StaticResource AppWarningColor}"
+                                       TextWrapping="WrapWholeWords" />
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.PreviewItems, Mode=OneWay}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="sys:String">
+                                        <TextBlock Text="{x:Bind}"
+                                                   Foreground="{StaticResource AppTextColor}"
+                                                   FontSize="13"
+                                                   TextWrapping="WrapWholeWords"
+                                                   Margin="0,2,0,2" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button Content="Lancer le nettoyage"
+                                    Command="{x:Bind ViewModel.ConfirmCleanupFromPreviewCommand}"
+                                    Style="{StaticResource PrimaryActionButtonStyle}"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Border>
+
                     <!-- Carte activité (progression + étapes) -->
                     <Border x:Name="ActivityCard"
                             Style="{StaticResource CardBorderStyle}"
+                            Padding="24,16"
+                            VerticalAlignment="Top"
                             x:Load="{x:Bind ViewModel.IsProgressVisible, Mode=OneWay}">
-                        <StackPanel Spacing="12">
+                        <StackPanel Spacing="10">
                             <TextBlock Text="Activité"
                                        FontSize="15"
                                        FontWeight="SemiBold"
@@ -309,32 +349,30 @@
                                          Height="6"
                                          Foreground="{StaticResource AppPrimaryColor}"
                                          Background="{StaticResource AppBorderColor}"
-                                         CornerRadius="3" />
-                            <ScrollViewer x:Name="TaskMessagesScroller"
-                                          MaxHeight="150"
-                                          VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled">
-                                <ItemsControl x:Name="TaskMessagesList"
-                                              ItemsSource="{x:Bind ViewModel.TaskMessages, Mode=OneWay}"
-                                              HorizontalAlignment="Stretch">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="sys:String">
-                                            <TextBlock Text="{x:Bind}"
-                                                       Foreground="{Binding Converter={StaticResource TaskMessageBrushConverter}}"
-                                                       FontSize="13"
-                                                       FontWeight="SemiBold"
-                                                       TextWrapping="WrapWholeWords"
-                                                       Margin="0,3,0,3" />
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
+                                         CornerRadius="3"
+                                         Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <ItemsControl x:Name="TaskMessagesList"
+                                          ItemsSource="{x:Bind ViewModel.TaskMessages, Mode=OneWay}"
+                                          HorizontalAlignment="Stretch">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="sys:String">
+                                        <TextBlock Text="{x:Bind}"
+                                                   Foreground="{Binding Converter={StaticResource TaskMessageBrushConverter}}"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold"
+                                                   TextWrapping="WrapWholeWords"
+                                                   Margin="0,2,0,2" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </StackPanel>
                     </Border>
 
                     <!-- Carte résumé / statut -->
-                    <Border Style="{StaticResource CardBorderStyle}">
-                        <StackPanel Spacing="8">
+                    <Border Style="{StaticResource CardBorderStyle}"
+                            Padding="24,16"
+                            VerticalAlignment="Top">
+                        <StackPanel Spacing="6">
                             <TextBlock Text="Résumé"
                                        FontSize="15"
                                        FontWeight="SemiBold"
@@ -416,6 +454,11 @@
                                          Text="{x:Bind ViewModel.ScheduledCleanupIntervalHoursText, Mode=TwoWay}" />
                             </StackPanel>
 
+                            <TextBlock Text="{x:Bind ViewModel.SchedulerStatusText, Mode=OneWay}"
+                                       FontSize="12"
+                                       Foreground="{StaticResource AppMutedTextColor}"
+                                       TextWrapping="WrapWholeWords" />
+
                             <TextBlock Text="{x:Bind ViewModel.HistorySummary, Mode=OneWay}"
                                        FontSize="12"
                                        Foreground="{StaticResource AppMutedTextColor}"
@@ -447,6 +490,9 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Content="Ouvrir les logs"
                                 Command="{x:Bind ViewModel.OpenLogsCommand}"
+                                Style="{StaticResource SecondaryButtonStyle}" />
+                        <Button Content="Exporter"
+                                Command="{x:Bind ViewModel.ExportHistoryCommand}"
                                 Style="{StaticResource SecondaryButtonStyle}" />
                         <Button Content="Effacer l'historique"
                                 Command="{x:Bind ViewModel.ClearHistoryCommand}"
