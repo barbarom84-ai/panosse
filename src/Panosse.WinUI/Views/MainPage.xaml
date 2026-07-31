@@ -251,6 +251,26 @@
                                            TextAlignment="Center"
                                            HorizontalAlignment="Center"
                                            MaxWidth="360" />
+                                <StackPanel Spacing="6" HorizontalAlignment="Center" Margin="0,4,0,0">
+                                    <TextBlock Text="Profil de nettoyage"
+                                               FontSize="12"
+                                               Foreground="{StaticResource AppSubtextColor}"
+                                               HorizontalAlignment="Center" />
+                                    <ComboBox Width="220"
+                                              HorizontalAlignment="Center"
+                                              SelectedIndex="{x:Bind ViewModel.CleanupProfileIndex, Mode=TwoWay}">
+                                        <ComboBoxItem Content="Rapide" />
+                                        <ComboBoxItem Content="Standard" />
+                                        <ComboBoxItem Content="Profond" />
+                                    </ComboBox>
+                                    <TextBlock Text="{x:Bind ViewModel.CleanupProfileDescription, Mode=OneWay}"
+                                               FontSize="12"
+                                               Foreground="{StaticResource AppMutedTextColor}"
+                                               TextWrapping="WrapWholeWords"
+                                               TextAlignment="Center"
+                                               HorizontalAlignment="Center"
+                                               MaxWidth="360" />
+                                </StackPanel>
                                 <Button x:Name="BtnNettoyer"
                                         Style="{StaticResource CircleButtonStyle}"
                                         Command="{x:Bind ViewModel.RunCleanupCommand}"

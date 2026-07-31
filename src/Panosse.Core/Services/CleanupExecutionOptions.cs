@@ -6,4 +6,5 @@ public sealed class CleanupExecutionOptions
 {
     public bool PreviewOnly { get; set; }
     public List<string> ExclusionPatterns { get; set; } = new();
+    public string CleanupProfile { get; set; } = CleanupProfiles.Standard;
 }

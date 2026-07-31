@@ -50,3 +50,51 @@ public class HistoryFormattingTests
         Assert.Contains("5", line);
     }
 }
+
+public class CleanupProfileTests
+{
+    [Theory]
+    [InlineData("rapid", CleanupProfiles.Rapid)]
+    [InlineData("Rapide", CleanupProfiles.Rapid)]
+    [InlineData("deep", CleanupProfiles.Deep)]
+    [InlineData("Profond", CleanupProfiles.Deep)]
+    [InlineData(null, CleanupProfiles.Standard)]
+    [InlineData("", CleanupProfiles.Standard)]
+    public void Normalize_MapsAliases(string? input, string expected)
+    {
+        Assert.Equal(expected, CleanupProfiles.Normalize(input));
+    }
+
+    [Fact]
+    public void Rapid_ExcludesBrowserDownloadsRegistryAndLogs()
+    {
+        Assert.True(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, CleanupProfiles.CategoryTemp));
+        Assert.True(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, CleanupProfiles.CategoryRecycle));
+        Assert.True(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, CleanupProfiles.CategoryThumbnails));
+        Assert.False(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, CleanupProfiles.CategoryBrowser));
+        Assert.False(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, CleanupProfiles.CategoryDownloads));
+        Assert.False(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, CleanupProfiles.CategoryRegistry));
+        Assert.False(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, CleanupProfiles.CategoryLogs));
+    }
+
+    [Fact]
+    public void Deep_RaisesRiskOnSensitiveCategories()
+    {
+        Assert.Equal("High", CleanupProfiles.GetRiskLevel(CleanupProfiles.Deep, CleanupProfiles.CategoryRegistry));
+        Assert.Equal("High", CleanupProfiles.GetRiskLevel(CleanupProfiles.Deep, CleanupProfiles.CategoryDownloads));
+        Assert.Equal("High", CleanupProfiles.GetRiskLevel(CleanupProfiles.Deep, CleanupProfiles.CategoryLogs));
+        Assert.Equal("Medium", CleanupProfiles.GetRiskLevel(CleanupProfiles.Standard, CleanupProfiles.CategoryDownloads));
+        Assert.Equal("Low", CleanupProfiles.GetRiskLevel(CleanupProfiles.Standard, CleanupProfiles.CategoryLogs));
+    }
+
+    [Fact]
+    public void IndexRoundTrip_IsStable()
+    {
+        Assert.Equal(0, CleanupProfiles.ToIndex(CleanupProfiles.Rapid));
+        Assert.Equal(1, CleanupProfiles.ToIndex(CleanupProfiles.Standard));
+        Assert.Equal(2, CleanupProfiles.ToIndex(CleanupProfiles.Deep));
+        Assert.Equal(CleanupProfiles.Rapid, CleanupProfiles.FromIndex(0));
+        Assert.Equal(CleanupProfiles.Standard, CleanupProfiles.FromIndex(1));
+        Assert.Equal(CleanupProfiles.Deep, CleanupProfiles.FromIndex(2));
+    }
+}

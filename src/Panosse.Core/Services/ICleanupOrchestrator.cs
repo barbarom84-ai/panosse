@@ -8,5 +8,7 @@ public interface ICleanupOrchestrator
 {
     IAsyncEnumerable<CleanupStepUpdate> StreamCleanupAsync(CleanupExecutionOptions options, CancellationToken cancellationToken = default);
     Task<CleanupRunResult> RunBackgroundCleanupAsync(CleanupExecutionOptions options, CancellationToken cancellationToken = default);
-    IReadOnlyList<CleanupPreviewItem> GetPreviewBreakdown(IReadOnlyList<string>? exclusionPatterns = null);
+    IReadOnlyList<CleanupPreviewItem> GetPreviewBreakdown(
+        IReadOnlyList<string>? exclusionPatterns = null,
+        string? cleanupProfile = null);
 }

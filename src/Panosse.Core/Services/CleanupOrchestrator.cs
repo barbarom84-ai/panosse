@@ -34,13 +34,13 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
     {
         options ??= new CleanupExecutionOptions();
         bool preview = options.PreviewOnly;
-        int totalSteps = 12;
+        string profile = CleanupProfiles.Normalize(options.CleanupProfile);
         int step = 0;
 
         var stopwatch = Stopwatch.StartNew();
         long totalFreedBytes = 0;
         string outcome = "success";
-        string details = $"steps={totalSteps}";
+        string details = $"profile={profile}";
 
         telemetryService.Increment(preview ? "cleanup_preview_start_count" : "cleanup_manual_start_count");
 
@@ -54,23 +54,28 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
             @"Mozilla\Firefox\Profiles");
         string thumbnails = Path.Combine(localAppData, @"Microsoft\Windows\Explorer");
 
-        var steps = new List<(string Start, Func<CancellationToken, Task<long>> Action, Func<long, string> End)>
+        var steps = new List<(string Category, string Start, Func<CancellationToken, Task<long>> Action, Func<long, string> End)>
         {
-            ("🗑️ Vidage de la corbeille...", ct => RunOrEstimateAsync(preview, () => { cleanupService.EmptyRecycleBinAsync().GetAwaiter().GetResult(); return 0L; }, 0), _ => "✅ Corbeille traitée"),
-            ("🧹 Nettoyage des fichiers temporaires...", _ => RunOrEstimateAsync(preview, cleanupService.CleanTemporaryFiles, EstimateDirectoryBytes(tempPath) + EstimateDirectoryBytes(windowsTemp)), b => $"✅ Fichiers temporaires traités ({ToMb(b)} Mo)"),
-            ("🌐 Nettoyage du cache Chrome...", _ => RunOrEstimateAsync(preview, cleanupService.CleanChromeCache, EstimateDirectoryBytes(chromeCache)), b => $"✅ Cache Chrome traité ({ToMb(b)} Mo)"),
-            ("🌐 Nettoyage du cache Edge...", _ => RunOrEstimateAsync(preview, cleanupService.CleanEdgeCache, EstimateDirectoryBytes(edgeCache)), b => $"✅ Cache Edge traité ({ToMb(b)} Mo)"),
-            ("🌐 Nettoyage du cache Firefox...", _ => RunOrEstimateAsync(preview, cleanupService.CleanFirefoxCache, EstimateFirefoxCacheBytes(firefoxProfiles)), b => $"✅ Cache Firefox traité ({ToMb(b)} Mo)"),
-            ("🌐 Nettoyage du cache Opera...", _ => RunOrEstimateAsync(preview, cleanupService.CleanOperaCache, 0), b => $"✅ Cache Opera traité ({ToMb(b)} Mo)"),
-            ("🌐 Nettoyage du cache Brave...", _ => RunOrEstimateAsync(preview, cleanupService.CleanBraveCache, 0), b => $"✅ Cache Brave traité ({ToMb(b)} Mo)"),
-            ("🌐 Nettoyage du cache Vivaldi...", _ => RunOrEstimateAsync(preview, cleanupService.CleanVivaldiCache, 0), b => $"✅ Cache Vivaldi traité ({ToMb(b)} Mo)"),
-            ("📋 Nettoyage du registre...", _ => RunOrEstimateAsync(preview, () => { cleanupService.CleanRegistry(); return 0L; }, 0), _ => "✅ Registre traité"),
-            ("📥 Nettoyage des téléchargements anciens...", _ => RunOrEstimateAsync(preview, () => cleanupService.CleanOldDownloads(options.ExclusionPatterns), EstimateOldDownloads(options.ExclusionPatterns)), b => $"✅ Téléchargements traités ({ToMb(b)} Mo)"),
-            ("📄 Nettoyage des logs Windows...", _ => RunOrEstimateAsync(preview, cleanupService.CleanWindowsLogs, EstimateDirectoryBytes(@"C:\Windows\Logs")), b => $"✅ Logs Windows traités ({ToMb(b)} Mo)"),
-            ("🖼️ Nettoyage du cache des miniatures...", _ => RunOrEstimateAsync(preview, cleanupService.CleanThumbnailCache, EstimateThumbnailBytes(thumbnails)), b => $"✅ Cache miniatures traité ({ToMb(b)} Mo)")
+            (CleanupProfiles.CategoryRecycle, "🗑️ Vidage de la corbeille...", ct => RunOrEstimateAsync(preview, () => { cleanupService.EmptyRecycleBinAsync().GetAwaiter().GetResult(); return 0L; }, 0), _ => "✅ Corbeille traitée"),
+            (CleanupProfiles.CategoryTemp, "🧹 Nettoyage des fichiers temporaires...", _ => RunOrEstimateAsync(preview, cleanupService.CleanTemporaryFiles, EstimateDirectoryBytes(tempPath) + EstimateDirectoryBytes(windowsTemp)), b => $"✅ Fichiers temporaires traités ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryBrowser, "🌐 Nettoyage du cache Chrome...", _ => RunOrEstimateAsync(preview, cleanupService.CleanChromeCache, EstimateDirectoryBytes(chromeCache)), b => $"✅ Cache Chrome traité ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryBrowser, "🌐 Nettoyage du cache Edge...", _ => RunOrEstimateAsync(preview, cleanupService.CleanEdgeCache, EstimateDirectoryBytes(edgeCache)), b => $"✅ Cache Edge traité ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryBrowser, "🌐 Nettoyage du cache Firefox...", _ => RunOrEstimateAsync(preview, cleanupService.CleanFirefoxCache, EstimateFirefoxCacheBytes(firefoxProfiles)), b => $"✅ Cache Firefox traité ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryBrowser, "🌐 Nettoyage du cache Opera...", _ => RunOrEstimateAsync(preview, cleanupService.CleanOperaCache, 0), b => $"✅ Cache Opera traité ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryBrowser, "🌐 Nettoyage du cache Brave...", _ => RunOrEstimateAsync(preview, cleanupService.CleanBraveCache, 0), b => $"✅ Cache Brave traité ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryBrowser, "🌐 Nettoyage du cache Vivaldi...", _ => RunOrEstimateAsync(preview, cleanupService.CleanVivaldiCache, 0), b => $"✅ Cache Vivaldi traité ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryRegistry, "📋 Nettoyage du registre...", _ => RunOrEstimateAsync(preview, () => { cleanupService.CleanRegistry(); return 0L; }, 0), _ => "✅ Registre traité"),
+            (CleanupProfiles.CategoryDownloads, "📥 Nettoyage des téléchargements anciens...", _ => RunOrEstimateAsync(preview, () => cleanupService.CleanOldDownloads(options.ExclusionPatterns), EstimateOldDownloads(options.ExclusionPatterns)), b => $"✅ Téléchargements traités ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryLogs, "📄 Nettoyage des logs Windows...", _ => RunOrEstimateAsync(preview, cleanupService.CleanWindowsLogs, EstimateDirectoryBytes(@"C:\Windows\Logs")), b => $"✅ Logs Windows traités ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryThumbnails, "🖼️ Nettoyage du cache des miniatures...", _ => RunOrEstimateAsync(preview, cleanupService.CleanThumbnailCache, EstimateThumbnailBytes(thumbnails)), b => $"✅ Cache miniatures traité ({ToMb(b)} Mo)")
         };
 
-        foreach (var item in steps)
+        List<(string Category, string Start, Func<CancellationToken, Task<long>> Action, Func<long, string> End)> filteredSteps =
+            steps.Where(s => CleanupProfiles.IncludesCategory(profile, s.Category)).ToList();
+        int totalSteps = Math.Max(1, filteredSteps.Count);
+        details = $"profile={profile};steps={totalSteps}";
+
+        foreach (var item in filteredSteps)
         {
             cancellationToken.ThrowIfCancellationRequested();
             step++;
@@ -90,7 +95,7 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
             catch (OperationCanceledException)
             {
                 outcome = "cancelled";
-                details = $"cancelled_at_step={step}";
+                details = $"cancelled_at_step={step};profile={profile}";
                 RecordCleanupHistory(preview, outcome, totalFreedBytes, stopwatch, details);
                 throw;
             }
@@ -123,7 +128,7 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
             totalFreedBytes / (1024 * 1024));
         telemetryService.RecordDuration("cleanup_duration_ms", stopwatch.Elapsed);
         RecordCleanupHistory(preview, outcome, totalFreedBytes, stopwatch, details);
-        logger.LogInfo("cleanup", $"Cleanup completed. preview={preview}, bytes={totalFreedBytes}.");
+        logger.LogInfo("cleanup", $"Cleanup completed. preview={preview}, profile={profile}, bytes={totalFreedBytes}.");
     }
 
     private void RecordCleanupHistory(
@@ -171,15 +176,19 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
 
         if (result.IsPreview)
         {
-            result.PreviewItems = GetPreviewBreakdown(options?.ExclusionPatterns).ToList();
+            result.PreviewItems = GetPreviewBreakdown(options?.ExclusionPatterns, options?.CleanupProfile).ToList();
         }
 
         return result;
     }
 
-    public IReadOnlyList<CleanupPreviewItem> GetPreviewBreakdown(IReadOnlyList<string>? exclusionPatterns = null)
+    public IReadOnlyList<CleanupPreviewItem> GetPreviewBreakdown(
+        IReadOnlyList<string>? exclusionPatterns = null,
+        string? cleanupProfile = null)
     {
-        return BuildPreviewItems(exclusionPatterns?.ToList() ?? new List<string>());
+        return BuildPreviewItems(
+            exclusionPatterns?.ToList() ?? new List<string>(),
+            CleanupProfiles.Normalize(cleanupProfile));
     }
 
     private static Task<long> RunOrEstimateAsync(bool preview, Func<long> execute, long estimated)
@@ -194,7 +203,7 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
 
     private static double ToMb(long bytes) => Math.Round(bytes / 1024.0 / 1024.0, 2);
 
-    private List<CleanupPreviewItem> BuildPreviewItems(List<string> exclusionPatterns)
+    private List<CleanupPreviewItem> BuildPreviewItems(List<string> exclusionPatterns, string profile)
     {
         string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         string downloadsPath = Path.Combine(userProfile, "Downloads");
@@ -213,44 +222,56 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
             + EstimateDirectoryBytes(edgeCache)
             + EstimateFirefoxCacheBytes(firefoxProfiles);
 
-        return new List<CleanupPreviewItem>
+        var items = new List<(string CategoryKey, CleanupPreviewItem Item)>
         {
-            new()
+            (CleanupProfiles.CategoryTemp, new CleanupPreviewItem
             {
                 Category = "Fichiers temporaires",
                 Location = tempPath,
                 EstimatedBytes = EstimateDirectoryBytes(tempPath) + EstimateDirectoryBytes(windowsTemp),
-                RiskLevel = "Low"
-            },
-            new()
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryTemp)
+            }),
+            (CleanupProfiles.CategoryBrowser, new CleanupPreviewItem
             {
                 Category = "Caches navigateurs",
                 Location = localAppData,
                 EstimatedBytes = browserBytes,
-                RiskLevel = "Low"
-            },
-            new()
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryBrowser)
+            }),
+            (CleanupProfiles.CategoryDownloads, new CleanupPreviewItem
             {
                 Category = "Téléchargements anciens",
                 Location = downloadsPath,
                 EstimatedBytes = EstimateOldDownloads(exclusionPatterns),
-                RiskLevel = "Medium"
-            },
-            new()
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryDownloads)
+            }),
+            (CleanupProfiles.CategoryLogs, new CleanupPreviewItem
             {
                 Category = "Logs Windows",
                 Location = logsPath,
                 EstimatedBytes = EstimateDirectoryBytes(logsPath),
-                RiskLevel = "Low"
-            },
-            new()
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryLogs)
+            }),
+            (CleanupProfiles.CategoryThumbnails, new CleanupPreviewItem
             {
                 Category = "Cache miniatures",
                 Location = thumbnails,
                 EstimatedBytes = EstimateThumbnailBytes(thumbnails),
-                RiskLevel = "Low"
-            }
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryThumbnails)
+            }),
+            (CleanupProfiles.CategoryRegistry, new CleanupPreviewItem
+            {
+                Category = "Registre",
+                Location = "HKCU",
+                EstimatedBytes = 0,
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryRegistry)
+            })
         };
+
+        return items
+            .Where(entry => CleanupProfiles.IncludesCategory(profile, entry.CategoryKey))
+            .Select(entry => entry.Item)
+            .ToList();
     }
 
     internal static long EstimateDirectoryBytes(string path)

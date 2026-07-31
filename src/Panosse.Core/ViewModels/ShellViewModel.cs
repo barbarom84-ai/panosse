@@ -31,18 +31,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     private bool isUpdateAvailable;
     private bool isCheckingUpdate;
     private bool isPreparingUpdate;
-    private bool isUpdatesExpanded;
-    private bool userChangedUpdatesExpanded;
-    private bool suppressUpdatesExpandedTracking;
-    private bool isTaskMessagesExpanded;
-    private bool isHistoryItemsExpanded;
-    private bool userChangedTaskMessagesExpanded;
-    private bool userChangedHistoryItemsExpanded;
-    private bool suppressTaskMessagesExpandedTracking;
-    private bool suppressHistoryItemsExpandedTracking;
-    private bool suppressUiLayoutPersistence;
     private bool suppressSettingsAutoSave;
-    private CancellationTokenSource? uiLayoutPersistDebounceCts;
     private CancellationTokenSource? settingsAutoSaveDebounceCts;
     private string? updateDownloadUrl;
     private string? updateTagName;
@@ -54,6 +43,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     private bool enableScheduledCleanup;
     private int scheduledCleanupIntervalHours = 24;
     private string schedulerStatusText = "Planification inactive.";
+    private string cleanupProfile = CleanupProfiles.Standard;
     private const int MaxVisibleTaskMessages = 6;
     private bool isSuccessStatus;
     private bool hasPreviewResults;
@@ -308,7 +298,6 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         {
             if (SetField(ref isUpdateAvailable, value))
             {
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UpdateHeaderText)));
                 (PrepareUpdateCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
@@ -318,54 +307,28 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
 
     public bool IsUpdateProgressVisible => IsPreparingUpdate;
 
-    public string UpdateHeaderText => IsUpdateAvailable ? "Mises à jour - Nouveau" : "Mises à jour";
-
-    public bool IsUpdatesExpanded
+    public string CleanupProfile
     {
-        get => isUpdatesExpanded;
+        get => cleanupProfile;
         set
         {
-            if (SetField(ref isUpdatesExpanded, value) && !suppressUpdatesExpandedTracking)
+            string normalized = CleanupProfiles.Normalize(value);
+            if (SetField(ref cleanupProfile, normalized))
             {
-                userChangedUpdatesExpanded = true;
-                SchedulePersistUiLayoutPreferences();
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CleanupProfileIndex)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CleanupProfileDescription)));
+                ScheduleAutoSaveSettings();
             }
         }
     }
 
-    public string TaskMessagesHeaderText => $"Messages de tâche ({TaskMessages.Count})";
-
-    public string HistoryItemsHeaderText => $"Historique récent ({HistoryItems.Count})";
-
-    public string TaskMessagesEmptyText => TaskMessages.Count == 0 ? "Aucun message de tâche." : string.Empty;
-
-    public string HistoryItemsEmptyText => HistoryItems.Count == 0 ? "Aucun élément d'historique." : string.Empty;
-
-    public bool IsTaskMessagesExpanded
+    public int CleanupProfileIndex
     {
-        get => isTaskMessagesExpanded;
-        set
-        {
-            if (SetField(ref isTaskMessagesExpanded, value) && !suppressTaskMessagesExpandedTracking)
-            {
-                userChangedTaskMessagesExpanded = true;
-                SchedulePersistUiLayoutPreferences();
-            }
-        }
+        get => CleanupProfiles.ToIndex(CleanupProfile);
+        set => CleanupProfile = CleanupProfiles.FromIndex(value);
     }
 
-    public bool IsHistoryItemsExpanded
-    {
-        get => isHistoryItemsExpanded;
-        set
-        {
-            if (SetField(ref isHistoryItemsExpanded, value) && !suppressHistoryItemsExpandedTracking)
-            {
-                userChangedHistoryItemsExpanded = true;
-                SchedulePersistUiLayoutPreferences();
-            }
-        }
-    }
+    public string CleanupProfileDescription => CleanupProfiles.GetDescription(CleanupProfile);
 
     public bool IsCheckingUpdate
     {
@@ -459,7 +422,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         {
             string confirmMessage = fromPreview && HasPreviewResults
                 ? BuildCleanupConfirmMessage()
-                : "Lancer le nettoyage des fichiers temporaires, caches et téléchargements anciens ?";
+                : BuildDefaultCleanupConfirmMessage();
 
             if (!await ConfirmCleanupAsync(confirmMessage))
             {
@@ -485,7 +448,8 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         var options = new CleanupExecutionOptions
         {
             PreviewOnly = preview,
-            ExclusionPatterns = GetExclusions()
+            ExclusionPatterns = GetExclusions(),
+            CleanupProfile = CleanupProfile
         };
 
         long totalFreedBytes = 0;
@@ -544,11 +508,23 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
+    private string BuildDefaultCleanupConfirmMessage()
+    {
+        string profileName = CleanupProfiles.GetDisplayName(CleanupProfile);
+        string message = $"Lancer le nettoyage ({profileName}) ?\n{CleanupProfiles.GetDescription(CleanupProfile)}";
+        if (CleanupProfiles.Normalize(CleanupProfile) == CleanupProfiles.Deep)
+        {
+            message += "\n\nAttention : le mode Profond inclut registre, téléchargements anciens et logs — certaines actions sont difficilement réversibles.";
+        }
+
+        return message;
+    }
+
     private string BuildCleanupConfirmMessage()
     {
         var lines = new List<string>
         {
-            "Confirmer le nettoyage avec les estimations actuelles ?"
+            $"Confirmer le nettoyage ({CleanupProfiles.GetDisplayName(CleanupProfile)}) avec les estimations actuelles ?"
         };
 
         if (!string.IsNullOrWhiteSpace(PreviewRiskSummary))
@@ -567,15 +543,21 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     private void PopulatePreviewResults(double totalMb)
     {
         PreviewItems.Clear();
-        IReadOnlyList<CleanupPreviewItem> items = cleanupOrchestrator.GetPreviewBreakdown(GetExclusions());
+        IReadOnlyList<CleanupPreviewItem> items = cleanupOrchestrator.GetPreviewBreakdown(GetExclusions(), CleanupProfile);
         bool hasMediumRisk = false;
+        bool hasHighRisk = false;
 
-        foreach (CleanupPreviewItem item in items.Where(i => i.EstimatedBytes > 0).OrderByDescending(i => i.EstimatedBytes))
+        foreach (CleanupPreviewItem item in items
+                     .Where(i => i.EstimatedBytes > 0 || string.Equals(i.RiskLevel, "High", StringComparison.OrdinalIgnoreCase))
+                     .OrderByDescending(i => i.EstimatedBytes))
         {
             double mb = Math.Round(item.EstimatedBytes / 1024.0 / 1024.0, 2);
             string risk = FormatRiskLevel(item.RiskLevel);
-            if (string.Equals(item.RiskLevel, "Medium", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(item.RiskLevel, "High", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(item.RiskLevel, "High", StringComparison.OrdinalIgnoreCase))
+            {
+                hasHighRisk = true;
+            }
+            else if (string.Equals(item.RiskLevel, "Medium", StringComparison.OrdinalIgnoreCase))
             {
                 hasMediumRisk = true;
             }
@@ -589,9 +571,11 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         }
 
         HasPreviewResults = PreviewItems.Count > 0;
-        PreviewRiskSummary = hasMediumRisk
-            ? "Attention : certaines catégories (ex. téléchargements) ont un risque moyen."
-            : "Risque faible pour les catégories listées.";
+        PreviewRiskSummary = hasHighRisk
+            ? "Attention (Profond) : registre, téléchargements ou logs à risque élevé."
+            : hasMediumRisk
+                ? "Attention : certaines catégories (ex. téléchargements) ont un risque moyen."
+                : $"Profil {CleanupProfiles.GetDisplayName(CleanupProfile)} — risque faible pour les catégories listées.";
     }
 
     private static string FormatRiskLevel(string riskLevel) =>
@@ -648,27 +632,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             ExclusionPatterns = settings.ExclusionPatterns ?? string.Empty;
             EnableScheduledCleanup = settings.EnableScheduledCleanup;
             ScheduledCleanupIntervalHours = Math.Max(1, settings.ScheduledCleanupIntervalHours);
-
-            if (settings.HasSavedUiLayoutPreferences)
-            {
-                suppressUiLayoutPersistence = true;
-                suppressTaskMessagesExpandedTracking = true;
-                suppressHistoryItemsExpandedTracking = true;
-                suppressUpdatesExpandedTracking = true;
-
-                IsTaskMessagesExpanded = settings.TaskMessagesExpanded;
-                IsHistoryItemsExpanded = settings.HistoryItemsExpanded;
-                IsUpdatesExpanded = settings.UpdatesExpanded;
-
-                suppressTaskMessagesExpandedTracking = false;
-                suppressHistoryItemsExpandedTracking = false;
-                suppressUpdatesExpandedTracking = false;
-                suppressUiLayoutPersistence = false;
-
-                userChangedTaskMessagesExpanded = true;
-                userChangedHistoryItemsExpanded = true;
-                userChangedUpdatesExpanded = true;
-            }
+            CleanupProfile = CleanupProfiles.Normalize(settings.CleanupProfile);
 
             ConfigureScheduledCleanup();
             suppressSettingsAutoSave = false;
@@ -856,12 +820,6 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             updateExpectedSha256 = result.ReleaseInfo.ExpectedSha256;
             IsUpdateAvailable = !string.IsNullOrWhiteSpace(updateDownloadUrl)
                 && !string.IsNullOrWhiteSpace(updateExpectedSha256);
-            if (IsUpdateAvailable && !userChangedUpdatesExpanded && !IsUpdatesExpanded)
-            {
-                suppressUpdatesExpandedTracking = true;
-                IsUpdatesExpanded = true;
-                suppressUpdatesExpandedTracking = false;
-            }
 
             UpdateStatusText = IsUpdateAvailable
                 ? $"Mise à jour disponible : {updateTagName}"
@@ -1033,15 +991,6 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
 
     private void OnTaskMessagesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (TaskMessages.Count > 0 && !userChangedTaskMessagesExpanded && !IsTaskMessagesExpanded)
-        {
-            suppressTaskMessagesExpandedTracking = true;
-            IsTaskMessagesExpanded = true;
-            suppressTaskMessagesExpandedTracking = false;
-        }
-
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TaskMessagesHeaderText)));
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TaskMessagesEmptyText)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasTaskMessages)));
     }
 
@@ -1056,68 +1005,13 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             ExclusionPatterns = ExclusionPatterns,
             EnableScheduledCleanup = EnableScheduledCleanup,
             ScheduledCleanupIntervalHours = ScheduledCleanupIntervalHours,
-            HasSavedUiLayoutPreferences = true,
-            TaskMessagesExpanded = IsTaskMessagesExpanded,
-            HistoryItemsExpanded = IsHistoryItemsExpanded,
-            UpdatesExpanded = IsUpdatesExpanded
+            CleanupProfile = CleanupProfile
         };
     }
 
     private void OnHistoryItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (HistoryItems.Count > 0 && !userChangedHistoryItemsExpanded && !IsHistoryItemsExpanded)
-        {
-            suppressHistoryItemsExpandedTracking = true;
-            IsHistoryItemsExpanded = true;
-            suppressHistoryItemsExpandedTracking = false;
-        }
-
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HistoryItemsHeaderText)));
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HistoryItemsEmptyText)));
-    }
-
-    private void PersistUiLayoutPreferencesBestEffort()
-    {
-        if (suppressUiLayoutPersistence)
-        {
-            return;
-        }
-
-        try
-        {
-            AppSettings settings = settingsService.Load();
-            settings.HasSavedUiLayoutPreferences = true;
-            settings.TaskMessagesExpanded = IsTaskMessagesExpanded;
-            settings.HistoryItemsExpanded = IsHistoryItemsExpanded;
-            settings.UpdatesExpanded = IsUpdatesExpanded;
-            settingsService.Save(settings);
-        }
-        catch (Exception ex)
-        {
-            loggerService.LogError("winui-settings", "Failed to persist UI layout preferences.", ex);
-        }
-    }
-
-    private void SchedulePersistUiLayoutPreferences()
-    {
-        uiLayoutPersistDebounceCts?.Cancel();
-        uiLayoutPersistDebounceCts?.Dispose();
-
-        var cts = new CancellationTokenSource();
-        uiLayoutPersistDebounceCts = cts;
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(350, cts.Token);
-                PersistUiLayoutPreferencesBestEffort();
-            }
-            catch (OperationCanceledException)
-            {
-                // Intentionally ignored: a newer UI change superseded this save.
-            }
-        });
+        // Kept for future history UI hooks.
     }
 
     private void ScheduleAutoSaveSettings()
@@ -1194,9 +1088,6 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
 
         TaskMessages.CollectionChanged -= OnTaskMessagesCollectionChanged;
         HistoryItems.CollectionChanged -= OnHistoryItemsCollectionChanged;
-        uiLayoutPersistDebounceCts?.Cancel();
-        uiLayoutPersistDebounceCts?.Dispose();
-        uiLayoutPersistDebounceCts = null;
         settingsAutoSaveDebounceCts?.Cancel();
         settingsAutoSaveDebounceCts?.Dispose();
         settingsAutoSaveDebounceCts = null;
