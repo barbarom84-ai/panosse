@@ -42,7 +42,9 @@ namespace Panosse.WinUI.Views
 
         private async void MainPage_Loaded(object sender, RoutedEventArgs e)
         {
+            DisplayLayoutHelper.ApplyUserScalePercent(ViewModel.UiScalePercent);
             DisplayLayoutHelper.ApplyWindowSize(App.MainWindow);
+            ViewModel.UiScaleChanged += ViewModel_UiScaleChanged;
             NavList.SelectedIndex = 0;
             UpdateMopAnimation();
             await CheckBrowsersAsync();
@@ -56,9 +58,19 @@ namespace Panosse.WinUI.Views
         private void MainPage_Unloaded(object sender, RoutedEventArgs e)
         {
             ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
+            ViewModel.UiScaleChanged -= ViewModel_UiScaleChanged;
             browserCloseCts?.Cancel();
             browserCloseCts?.Dispose();
             browserCloseCts = null;
+        }
+
+        private void ViewModel_UiScaleChanged(object? sender, EventArgs e)
+        {
+            DisplayLayoutHelper.ApplyUserScalePercent(ViewModel.UiScalePercent);
+            if (App.MainWindow is not null)
+            {
+                DisplayLayoutHelper.ApplyWindowSize(App.MainWindow);
+            }
         }
 
         private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)

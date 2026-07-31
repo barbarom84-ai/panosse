@@ -117,6 +117,7 @@ public class SettingsMigrationTests
         Assert.Equal(AppSettings.CurrentSchemaVersion, settings.SchemaVersion);
         Assert.Equal(24, settings.ScheduledCleanupIntervalHours);
         Assert.Equal(CleanupProfiles.Deep, settings.CleanupProfile);
+        Assert.Equal(100, settings.UiScalePercent);
     }
 
     [Fact]
@@ -126,13 +127,72 @@ public class SettingsMigrationTests
         {
             SchemaVersion = AppSettings.CurrentSchemaVersion,
             CleanupProfile = CleanupProfiles.Standard,
-            ScheduledCleanupIntervalHours = 12
+            ScheduledCleanupIntervalHours = 12,
+            UiScalePercent = 110
         };
 
         bool migrated = SettingsService.MigrateIfNeeded(settings);
 
         Assert.False(migrated);
         Assert.Equal(12, settings.ScheduledCleanupIntervalHours);
+        Assert.Equal(110, settings.UiScalePercent);
+    }
+
+    [Fact]
+    public void MigrateIfNeeded_V1ToV2_AddsUiScale()
+    {
+        var settings = new AppSettings
+        {
+            SchemaVersion = 1,
+            UiScalePercent = 0
+        };
+
+        bool migrated = SettingsService.MigrateIfNeeded(settings);
+
+        Assert.True(migrated);
+        Assert.Equal(2, settings.SchemaVersion);
+        Assert.Equal(100, settings.UiScalePercent);
+    }
+}
+
+public class UpdateShaTests
+{
+    [Fact]
+    public void ValidateDownloadedExecutable_RejectsBadHash()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"panosse-sha-{Guid.NewGuid():N}.bin");
+        File.WriteAllText(path, "hello");
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() =>
+                UpdateDownloadService.ValidateDownloadedExecutable(path, "00"));
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
+    public void ValidateDownloadedExecutable_AcceptsMatchingHash()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"panosse-sha-{Guid.NewGuid():N}.bin");
+        File.WriteAllText(path, "hello");
+        try
+        {
+            string hash = UpdateDownloadService.ComputeSha256Hex(path);
+            UpdateDownloadService.ValidateDownloadedExecutable(path, hash);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
     }
 }
 

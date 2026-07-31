@@ -37,6 +37,8 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     private string? updateTagName;
     private string? updateExpectedSha256;
     private string? preparedScriptPath;
+    private string? downloadedUpdatePath;
+    private UpdatePhase updatePhase = UpdatePhase.Idle;
     private bool checkUpdatesOnStartup = true;
     private bool playSuccessSound = true;
     private bool showTrayNotifications = true;
@@ -44,6 +46,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     private int scheduledCleanupIntervalHours = 24;
     private string schedulerStatusText = "Planification inactive.";
     private string cleanupProfile = CleanupProfiles.Standard;
+    private int uiScalePercent = 100;
     private const int MaxVisibleTaskMessages = 6;
     private bool isSuccessStatus;
     private bool hasPreviewResults;
@@ -294,54 +297,21 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     public string UpdateStatusText
     {
         get => updateStatusText;
-        set
-        {
-            if (SetField(ref updateStatusText, value))
-            {
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UpdatePhaseText)));
-            }
-        }
+        set => SetField(ref updateStatusText, value);
     }
 
-    public string UpdatePhaseText
+    public UpdatePhase CurrentUpdatePhase => updatePhase;
+
+    public string UpdatePhaseText => updatePhase switch
     {
-        get
-        {
-            if (IsPreparingUpdate)
-            {
-                return "Téléchargement / préparation…";
-            }
-
-            if (IsCheckingUpdate)
-            {
-                return "Vérification en cours…";
-            }
-
-            if (IsInstallReady)
-            {
-                return "Mise à jour prête à installer.";
-            }
-
-            if (IsUpdateAvailable)
-            {
-                return "Mise à jour disponible.";
-            }
-
-            if (UpdateStatusText.Contains("déjà à jour", StringComparison.OrdinalIgnoreCase) ||
-                UpdateStatusText.Contains("deja a jour", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Application à jour.";
-            }
-
-            if (UpdateStatusText.Contains("Erreur", StringComparison.OrdinalIgnoreCase) ||
-                UpdateStatusText.Contains("impossible", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Erreur de mise à jour.";
-            }
-
-            return UpdateStatusText;
-        }
-    }
+        UpdatePhase.Checking => "Vérification en cours…",
+        UpdatePhase.Downloading => "Téléchargement / préparation…",
+        UpdatePhase.Ready => "Mise à jour prête à installer.",
+        UpdatePhase.Available => "Mise à jour disponible.",
+        UpdatePhase.UpToDate => "Application à jour.",
+        UpdatePhase.Error => "Erreur de mise à jour.",
+        _ => UpdateStatusText
+    };
 
     public double UpdateProgressValue
     {
@@ -388,6 +358,39 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public string CleanupProfileDescription => CleanupProfiles.GetDescription(CleanupProfile);
+
+    public int UiScalePercent
+    {
+        get => uiScalePercent;
+        set
+        {
+            int normalized = value is 110 or 125 ? value : 100;
+            if (SetField(ref uiScalePercent, normalized))
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UiScaleIndex)));
+                ScheduleAutoSaveSettings();
+                UiScaleChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+    }
+
+    public int UiScaleIndex
+    {
+        get => UiScalePercent switch
+        {
+            110 => 1,
+            125 => 2,
+            _ => 0
+        };
+        set => UiScalePercent = value switch
+        {
+            1 => 110,
+            2 => 125,
+            _ => 100
+        };
+    }
+
+    public event EventHandler? UiScaleChanged;
 
     public bool IsCheckingUpdate
     {
@@ -749,6 +752,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             EnableScheduledCleanup = settings.EnableScheduledCleanup;
             ScheduledCleanupIntervalHours = Math.Max(1, settings.ScheduledCleanupIntervalHours);
             CleanupProfile = CleanupProfiles.Normalize(settings.CleanupProfile);
+            UiScalePercent = settings.UiScalePercent is 110 or 125 ? settings.UiScalePercent : 100;
 
             ConfigureScheduledCleanup();
             suppressSettingsAutoSave = false;
@@ -903,134 +907,6 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    private async Task ExecuteCheckUpdatesAsync()
-    {
-        IsCheckingUpdate = true;
-        IsUpdateAvailable = false;
-        updateDownloadUrl = null;
-        updateTagName = null;
-        updateExpectedSha256 = null;
-        preparedScriptPath = null;
-        NotifyInstallReadyChanged();
-        UpdateStatusText = "Vérification des mises à jour...";
-        UpdateProgressValue = 0;
-
-        try
-        {
-            string currentVersion = Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.0.0";
-            UpdateCheckResult result = await updateService.CheckForUpdateAsync(GithubRepo, currentVersion);
-            if (result.VerificationFailed)
-            {
-                UpdateStatusText = "Vérification impossible. Vérifiez votre connexion.";
-                return;
-            }
-
-            if (!result.HasUpdate || result.ReleaseInfo == null)
-            {
-                UpdateStatusText = "Application déjà à jour.";
-                return;
-            }
-
-            updateTagName = result.ReleaseInfo.TagName;
-            updateDownloadUrl = result.ReleaseInfo.DownloadUrl;
-            updateExpectedSha256 = result.ReleaseInfo.ExpectedSha256;
-            IsUpdateAvailable = !string.IsNullOrWhiteSpace(updateDownloadUrl)
-                && !string.IsNullOrWhiteSpace(updateExpectedSha256);
-
-            UpdateStatusText = IsUpdateAvailable
-                ? $"Mise à jour disponible : {updateTagName}"
-                : string.IsNullOrWhiteSpace(updateDownloadUrl)
-                    ? $"Mise à jour détectée ({updateTagName}) sans binaire .exe."
-                    : $"Mise à jour détectée ({updateTagName}) sans checksum SHA256.";
-        }
-        catch (Exception ex)
-        {
-            UpdateStatusText = $"Erreur mise à jour : {ex.Message}";
-            loggerService.LogError("winui-update", "Update check exception.", ex);
-        }
-        finally
-        {
-            IsCheckingUpdate = false;
-        }
-    }
-
-    private async Task ExecutePrepareUpdateAsync()
-    {
-        if (string.IsNullOrWhiteSpace(updateDownloadUrl))
-        {
-            UpdateStatusText = "Aucun lien de téléchargement disponible.";
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(updateExpectedSha256))
-        {
-            UpdateStatusText = "Checksum SHA256 indisponible pour cette mise à jour.";
-            return;
-        }
-
-        string currentExePath = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(currentExePath))
-        {
-            UpdateStatusText = "Impossible de déterminer le chemin de l'application.";
-            return;
-        }
-
-        IsPreparingUpdate = true;
-        UpdateProgressValue = 0;
-        UpdateStatusText = "Préparation de la mise à jour...";
-        preparedScriptPath = null;
-
-        try
-        {
-            string targetVersion = string.IsNullOrWhiteSpace(updateTagName) ? "latest" : updateTagName.Trim();
-            string downloadedPath = Path.Combine(Path.GetTempPath(), $"Panosse-{targetVersion}.exe");
-
-            await foreach (UpdateDownloadProgress progress in updateOrchestrator.DownloadAndPrepareInstallAsync(
-                               updateDownloadUrl,
-                               currentExePath,
-                               updateTagName,
-                               updateExpectedSha256))
-            {
-                UpdateProgressValue = progress.ProgressPercent;
-                UpdateStatusText = progress.Message;
-            }
-
-            UpdateInstallResult result = await updateOrchestrator.BuildInstallScriptAsync(downloadedPath, currentExePath, updateTagName);
-            if (!result.Success || string.IsNullOrWhiteSpace(result.ScriptPath))
-            {
-                UpdateStatusText = string.IsNullOrWhiteSpace(result.ErrorMessage)
-                    ? "Préparation de la mise à jour échouée."
-                    : result.ErrorMessage;
-                return;
-            }
-
-            preparedScriptPath = result.ScriptPath;
-            UpdateStatusText = "Mise à jour préparée. Cliquez sur Installer.";
-            NotifyInstallReadyChanged();
-        }
-        catch (Exception ex)
-        {
-            UpdateStatusText = $"Erreur préparation mise à jour : {ex.Message}";
-            loggerService.LogError("winui-update", "Update preparation exception.", ex);
-        }
-        finally
-        {
-            IsPreparingUpdate = false;
-        }
-    }
-
-    private void ExecuteInstallPreparedUpdate()
-    {
-        if (string.IsNullOrWhiteSpace(preparedScriptPath))
-        {
-            UpdateStatusText = "Aucun script de mise à jour préparé.";
-            return;
-        }
-
-        UpdateStatusText = "Installation en cours...";
-        updateOrchestrator.LaunchInstallerAndShutdown(preparedScriptPath);
-    }
-
     private void ConfigureScheduledCleanup()
     {
         try
@@ -1122,6 +998,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             EnableScheduledCleanup = EnableScheduledCleanup,
             ScheduledCleanupIntervalHours = ScheduledCleanupIntervalHours,
             CleanupProfile = CleanupProfile,
+            UiScalePercent = UiScalePercent,
             SchemaVersion = AppSettings.CurrentSchemaVersion
         };
     }

@@ -73,13 +73,25 @@ public sealed class SettingsService : ISettingsService
             return false;
         }
 
-        // v0 -> v1: clamp schedule, normalize profile, drop obsolete expander fields (already ignored).
+        // v0 -> v1: clamp schedule, normalize profile.
         if (from < 1)
         {
             Normalize(settings);
             settings.SchemaVersion = 1;
         }
 
+        // v1 -> v2: introduce UiScalePercent default.
+        if (from < 2)
+        {
+            if (settings.UiScalePercent is not (100 or 110 or 125))
+            {
+                settings.UiScalePercent = 100;
+            }
+
+            settings.SchemaVersion = 2;
+        }
+
+        Normalize(settings);
         settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
         return true;
     }
@@ -93,6 +105,10 @@ public sealed class SettingsService : ISettingsService
 
         settings.CleanupProfile = CleanupProfiles.Normalize(settings.CleanupProfile);
         settings.ExclusionPatterns ??= string.Empty;
+        if (settings.UiScalePercent is not (100 or 110 or 125))
+        {
+            settings.UiScalePercent = 100;
+        }
     }
 
     private static AppSettings CreateDefaultSettings() =>

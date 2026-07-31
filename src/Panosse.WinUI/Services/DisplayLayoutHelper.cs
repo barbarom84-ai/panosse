@@ -7,7 +7,7 @@ using WinRT.Interop;
 namespace Panosse.WinUI.Services;
 
 /// <summary>
-/// Calcule une taille de fenêtre adaptée à la zone de travail et au facteur DPI courant.
+/// Calcule une taille de fenêtre adaptée à la zone de travail, au DPI et à l'échelle UI utilisateur.
 /// Taille de référence compacte type PC Manager (~720×680), clampée à la zone utile.
 /// </summary>
 internal static class DisplayLayoutHelper
@@ -15,6 +15,11 @@ internal static class DisplayLayoutHelper
     // Taille de référence à 100 % (pixels effectifs XAML).
     private const double BaseWidth = 720;
     private const double BaseHeight = 680;
+
+    /// <summary>
+    /// User preference multiplier (1.0, 1.1, 1.25). Combined with DPI scale.
+    /// </summary>
+    public static double UserScale { get; set; } = 1.0;
 
     public static SizeInt32 CalculateWindowSize(Window window)
     {
@@ -29,7 +34,7 @@ internal static class DisplayLayoutHelper
             scale = root.XamlRoot.RasterizationScale;
         }
 
-        scale = Math.Clamp(scale, 1.0, 2.5);
+        scale = Math.Clamp(scale, 1.0, 2.5) * Math.Clamp(UserScale, 1.0, 1.25);
 
         int width = (int)Math.Round(BaseWidth * scale);
         int height = (int)Math.Round(BaseHeight * scale);
@@ -55,5 +60,15 @@ internal static class DisplayLayoutHelper
         WindowId windowId = Win32Interop.GetWindowIdFromWindow(hWnd);
         AppWindow appWindow = AppWindow.GetFromWindowId(windowId);
         appWindow.Resize(CalculateWindowSize(window));
+    }
+
+    public static void ApplyUserScalePercent(int percent)
+    {
+        UserScale = percent switch
+        {
+            110 => 1.10,
+            125 => 1.25,
+            _ => 1.0
+        };
     }
 }

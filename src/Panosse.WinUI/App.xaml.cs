@@ -132,6 +132,8 @@ namespace Panosse.WinUI
             services.AddSingleton<ICleanupOrchestrator, CleanupOrchestrator>();
             services.AddSingleton<IBrowserProcessService, BrowserProcessService>();
             services.AddSingleton<IUpdateService, UpdateService>();
+            services.AddSingleton<IUpdateDownloadService, UpdateDownloadService>();
+            services.AddSingleton<IUpdateInstallService, UpdateInstallService>();
             services.AddSingleton<IUpdateOrchestrator, UpdateOrchestrator>();
             services.AddSingleton<IDiagnosticsService, DiagnosticsService>();
             services.AddSingleton<ShellViewModel>();

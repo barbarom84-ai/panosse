@@ -2,7 +2,7 @@ namespace Panosse.Services;
 
 public sealed class AppSettings
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     /// <summary>
     /// Settings schema version for migrations.
@@ -21,4 +21,9 @@ public sealed class AppSettings
     /// Cleanup intensity: Rapid, Standard, or Deep.
     /// </summary>
     public string CleanupProfile { get; set; } = CleanupProfiles.Standard;
+
+    /// <summary>
+    /// UI scale preference percent: 100, 110, or 125.
+    /// </summary>
+    public int UiScalePercent { get; set; } = 100;
 }

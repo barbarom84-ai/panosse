@@ -9,11 +9,19 @@ namespace Panosse.Services;
 
 public sealed class UpdateService : IUpdateService
 {
+    private readonly ITelemetryService telemetryService;
+
+    public UpdateService(ITelemetryService telemetryService)
+    {
+        this.telemetryService = telemetryService;
+    }
+
     public async Task<UpdateCheckResult> CheckForUpdateAsync(
         string githubRepo,
         string currentVersion,
         CancellationToken cancellationToken = default)
     {
+        telemetryService.Increment("update_check_start_count");
         try
         {
             using var client = new HttpClient
@@ -33,21 +41,25 @@ public sealed class UpdateService : IUpdateService
 
             if (string.IsNullOrWhiteSpace(tagName) || string.IsNullOrWhiteSpace(htmlUrl))
             {
+                telemetryService.Increment("update_check_failed_count");
                 return UpdateCheckResult.Failed();
             }
 
             if (!TryGetPortableExeAsset(root, out string downloadUrl, out string exeFileName))
             {
+                telemetryService.Increment("update_check_failed_count");
                 return UpdateCheckResult.Failed();
             }
 
             string remoteVersion = tagName.TrimStart('v');
             if (!IsRemoteVersionNewer(remoteVersion, currentVersion))
             {
+                telemetryService.Increment("update_check_up_to_date_count");
                 return UpdateCheckResult.UpToDate();
             }
 
             string? expectedSha256 = await TryGetExpectedSha256Async(client, root, exeFileName, cancellationToken);
+            telemetryService.Increment("update_check_update_available_count");
 
             return UpdateCheckResult.UpdateAvailable(new UpdateReleaseInfo
             {
@@ -60,18 +72,22 @@ public sealed class UpdateService : IUpdateService
         }
         catch (HttpRequestException)
         {
+            telemetryService.Increment("update_check_failed_count");
             return UpdateCheckResult.Failed();
         }
         catch (TaskCanceledException)
         {
+            telemetryService.Increment("update_check_failed_count");
             return UpdateCheckResult.Failed();
         }
         catch (JsonException)
         {
+            telemetryService.Increment("update_check_failed_count");
             return UpdateCheckResult.Failed();
         }
         catch
         {
+            telemetryService.Increment("update_check_error_count");
             return UpdateCheckResult.Failed();
         }
     }

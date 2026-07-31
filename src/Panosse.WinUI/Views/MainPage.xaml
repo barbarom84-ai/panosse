@@ -281,6 +281,7 @@
                                         Style="{StaticResource CircleButtonStyle}"
                                         Command="{x:Bind ViewModel.RunCleanupCommand}"
                                         AutomationProperties.Name="{x:Bind ViewModel.ButtonText, Mode=OneWay}"
+                                        AutomationProperties.HelpText="Lance le nettoyage selon le profil sélectionné"
                                         ToolTipService.ToolTip="{x:Bind ViewModel.ButtonText, Mode=OneWay}"
                                         HorizontalAlignment="Center"
                                         Margin="0,6,0,0">
@@ -303,7 +304,8 @@
                                 <HyperlinkButton Content="Aperçu du nettoyage"
                                                  Command="{x:Bind ViewModel.RunPreviewCommand}"
                                                  HorizontalAlignment="Center"
-                                                 FontSize="13" />
+                                                 FontSize="13"
+                                                 AutomationProperties.Name="Aperçu du nettoyage" />
                             </StackPanel>
 
                             <!-- Avertissement Navigateurs -->
@@ -450,6 +452,18 @@
                                       IsChecked="{x:Bind ViewModel.PreviewModeEnabled, Mode=TwoWay}"
                                       FontSize="14"
                                       Foreground="{StaticResource AppTextColor}" />
+
+                            <TextBlock Text="Échelle de l'interface"
+                                       FontSize="12"
+                                       Foreground="{StaticResource AppSubtextColor}" />
+                            <ComboBox Width="220"
+                                      HorizontalAlignment="Left"
+                                      SelectedIndex="{x:Bind ViewModel.UiScaleIndex, Mode=TwoWay}"
+                                      AutomationProperties.Name="Échelle de l'interface">
+                                <ComboBoxItem Content="100 %" />
+                                <ComboBoxItem Content="110 %" />
+                                <ComboBoxItem Content="125 %" />
+                            </ComboBox>
 
                             <TextBlock Text="Exclusions intelligentes (mots-clés, séparés par virgules)"
                                        FontSize="12"
