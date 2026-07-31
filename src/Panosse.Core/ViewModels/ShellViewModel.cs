@@ -48,6 +48,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     private bool isSuccessStatus;
     private bool hasPreviewResults;
     private string previewRiskSummary = string.Empty;
+    private CancellationTokenSource? cleanupCts;
     private System.Timers.Timer? scheduledCleanupTimer;
     private readonly SemaphoreSlim scheduledCleanupLock = new(1, 1);
     private bool disposed;
@@ -57,6 +58,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     private readonly IOperationHistoryService historyService;
     private readonly IUpdateService updateService;
     private readonly IUpdateOrchestrator updateOrchestrator;
+    private readonly IDiagnosticsService diagnosticsService;
     private const string GithubRepo = "barbarom84-ai/panosse";
     private static readonly TimeSpan MinimumCleanupDuration = TimeSpan.FromSeconds(1.5);
 
@@ -76,7 +78,8 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         ISettingsService settingsService,
         IOperationHistoryService historyService,
         IUpdateService updateService,
-        IUpdateOrchestrator updateOrchestrator)
+        IUpdateOrchestrator updateOrchestrator,
+        IDiagnosticsService diagnosticsService)
     {
         this.cleanupOrchestrator = cleanupOrchestrator;
         this.loggerService = loggerService;
@@ -84,6 +87,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         this.historyService = historyService;
         this.updateService = updateService;
         this.updateOrchestrator = updateOrchestrator;
+        this.diagnosticsService = diagnosticsService;
 
         RunCleanupCommand = new AsyncRelayCommand(
             executeAsync: () => ExecuteCleanupAsync(previewOnly: false),
@@ -97,11 +101,15 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             executeAsync: () => ExecuteCleanupAsync(previewOnly: false, fromPreview: true),
             canExecute: () => !IsBusy && HasPreviewResults,
             onException: ex => loggerService.LogError("winui-cleanup", "Confirm cleanup failed.", ex));
+        CancelCleanupCommand = new RelayCommand(
+            execute: CancelCleanup,
+            canExecute: () => IsBusy);
 
         SaveSettingsCommand = new RelayCommand(SaveSettings);
         RefreshHistoryCommand = new RelayCommand(RefreshHistory);
         ClearHistoryCommand = new RelayCommand(ClearHistory);
         ExportHistoryCommand = new RelayCommand(ExportHistory);
+        RunDiagnosticsCommand = new RelayCommand(RunDiagnostics);
         CheckUpdatesCommand = new AsyncRelayCommand(
             executeAsync: ExecuteCheckUpdatesAsync,
             canExecute: () => !IsCheckingUpdate && !IsPreparingUpdate,
@@ -127,14 +135,17 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     public ObservableCollection<string> TaskMessages { get; } = new();
     public ObservableCollection<string> HistoryItems { get; } = new();
     public ObservableCollection<string> PreviewItems { get; } = new();
+    public ObservableCollection<string> DiagnosticItems { get; } = new();
 
     public ICommand RunCleanupCommand { get; }
     public ICommand RunPreviewCommand { get; }
     public ICommand ConfirmCleanupFromPreviewCommand { get; }
+    public ICommand CancelCleanupCommand { get; }
     public ICommand SaveSettingsCommand { get; }
     public ICommand RefreshHistoryCommand { get; }
     public ICommand ClearHistoryCommand { get; }
     public ICommand ExportHistoryCommand { get; }
+    public ICommand RunDiagnosticsCommand { get; }
     public ICommand CheckUpdatesCommand { get; }
     public ICommand PrepareUpdateCommand { get; }
     public ICommand InstallPreparedUpdateCommand { get; }
@@ -174,6 +185,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
                 (RunCleanupCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 (RunPreviewCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 (ConfirmCleanupFromPreviewCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (CancelCleanupCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsProgressVisible)));
             }
         }
@@ -282,7 +294,53 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     public string UpdateStatusText
     {
         get => updateStatusText;
-        set => SetField(ref updateStatusText, value);
+        set
+        {
+            if (SetField(ref updateStatusText, value))
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UpdatePhaseText)));
+            }
+        }
+    }
+
+    public string UpdatePhaseText
+    {
+        get
+        {
+            if (IsPreparingUpdate)
+            {
+                return "Téléchargement / préparation…";
+            }
+
+            if (IsCheckingUpdate)
+            {
+                return "Vérification en cours…";
+            }
+
+            if (IsInstallReady)
+            {
+                return "Mise à jour prête à installer.";
+            }
+
+            if (IsUpdateAvailable)
+            {
+                return "Mise à jour disponible.";
+            }
+
+            if (UpdateStatusText.Contains("déjà à jour", StringComparison.OrdinalIgnoreCase) ||
+                UpdateStatusText.Contains("deja a jour", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Application à jour.";
+            }
+
+            if (UpdateStatusText.Contains("Erreur", StringComparison.OrdinalIgnoreCase) ||
+                UpdateStatusText.Contains("impossible", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Erreur de mise à jour.";
+            }
+
+            return UpdateStatusText;
+        }
     }
 
     public double UpdateProgressValue
@@ -299,6 +357,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             if (SetField(ref isUpdateAvailable, value))
             {
                 (PrepareUpdateCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UpdatePhaseText)));
             }
         }
     }
@@ -338,6 +397,8 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             if (SetField(ref isCheckingUpdate, value))
             {
                 (CheckUpdatesCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UpdatePhaseText)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanCheckUpdates)));
             }
         }
     }
@@ -353,9 +414,13 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
                 (PrepareUpdateCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 (InstallPreparedUpdateCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsUpdateProgressVisible)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UpdatePhaseText)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanCheckUpdates)));
             }
         }
     }
+
+    public bool CanCheckUpdates => !IsCheckingUpdate && !IsPreparingUpdate;
 
     public bool EnableScheduledCleanup
     {
@@ -432,6 +497,9 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         }
 
         IsBusy = true;
+        cleanupCts?.Dispose();
+        cleanupCts = new CancellationTokenSource();
+        CancellationToken token = cleanupCts.Token;
         Stopwatch cleanupStopwatch = Stopwatch.StartNew();
         IsSuccessStatus = false;
         ButtonText = preview ? "Prévisualisation..." : "Nettoyage...";
@@ -455,7 +523,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         long totalFreedBytes = 0;
         try
         {
-            await foreach (CleanupStepUpdate update in cleanupOrchestrator.StreamCleanupAsync(options))
+            await foreach (CleanupStepUpdate update in cleanupOrchestrator.StreamCleanupAsync(options, token))
             {
                 StatusText = update.Message;
                 if (update.IsCompleted)
@@ -492,6 +560,14 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
 
             RefreshHistory();
         }
+        catch (OperationCanceledException)
+        {
+            IsSuccessStatus = false;
+            StatusText = preview ? "Aperçu annulé." : "Nettoyage annulé.";
+            LastRunSummary = StatusText;
+            AddTaskMessage(StatusText);
+            RefreshHistory();
+        }
         catch (Exception ex)
         {
             await EnsureMinimumCleanupDurationAsync(cleanupStopwatch);
@@ -503,8 +579,48 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         }
         finally
         {
+            cleanupCts?.Dispose();
+            cleanupCts = null;
             IsBusy = false;
             ButtonText = "Passer la panosse";
+        }
+    }
+
+    private void CancelCleanup()
+    {
+        try
+        {
+            cleanupCts?.Cancel();
+            StatusText = "Annulation en cours...";
+        }
+        catch (Exception ex)
+        {
+            loggerService.LogError("winui-cleanup", "Failed to cancel cleanup.", ex);
+        }
+    }
+
+    private void RunDiagnostics()
+    {
+        try
+        {
+            DiagnosticItems.Clear();
+            foreach (DiagnosticItem item in diagnosticsService.RunChecks())
+            {
+                DiagnosticItems.Add(item.DisplayLine);
+            }
+
+            int errors = DiagnosticItems.Count(line => line.StartsWith('❌'));
+            int warnings = DiagnosticItems.Count(line => line.StartsWith('⚠'));
+            StatusText = errors > 0
+                ? $"Diagnostics : {errors} problème(s), {warnings} avertissement(s)."
+                : warnings > 0
+                    ? $"Diagnostics : {warnings} avertissement(s)."
+                    : "Diagnostics : tout est OK.";
+        }
+        catch (Exception ex)
+        {
+            loggerService.LogError("winui-diagnostics", "Diagnostics failed.", ex);
+            StatusText = "Impossible d'exécuter les diagnostics.";
         }
     }
 
@@ -1005,7 +1121,8 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             ExclusionPatterns = ExclusionPatterns,
             EnableScheduledCleanup = EnableScheduledCleanup,
             ScheduledCleanupIntervalHours = ScheduledCleanupIntervalHours,
-            CleanupProfile = CleanupProfile
+            CleanupProfile = CleanupProfile,
+            SchemaVersion = AppSettings.CurrentSchemaVersion
         };
     }
 
@@ -1056,6 +1173,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     private void NotifyInstallReadyChanged()
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsInstallReady)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UpdatePhaseText)));
         (InstallPreparedUpdateCommand as RelayCommand)?.RaiseCanExecuteChanged();
     }
 
@@ -1088,6 +1206,9 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
 
         TaskMessages.CollectionChanged -= OnTaskMessagesCollectionChanged;
         HistoryItems.CollectionChanged -= OnHistoryItemsCollectionChanged;
+        cleanupCts?.Cancel();
+        cleanupCts?.Dispose();
+        cleanupCts = null;
         settingsAutoSaveDebounceCts?.Cancel();
         settingsAutoSaveDebounceCts?.Dispose();
         settingsAutoSaveDebounceCts = null;

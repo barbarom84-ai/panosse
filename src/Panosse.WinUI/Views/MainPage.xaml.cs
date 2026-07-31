@@ -130,11 +130,17 @@ namespace Panosse.WinUI.Views
             HomePanel.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
             SettingsPanel.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
             HistoryPanel.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
-            AboutPanel.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
+            DiagnosticsPanel.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
+            AboutPanel.Visibility = index == 4 ? Visibility.Visible : Visibility.Collapsed;
 
             if (index == 1 || index == 2)
             {
                 ViewModel.RefreshHistoryCommand.Execute(null);
+            }
+
+            if (index == 3 && ViewModel.DiagnosticItems.Count == 0)
+            {
+                ViewModel.RunDiagnosticsCommand.Execute(null);
             }
         }
 

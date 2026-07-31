@@ -20,18 +20,24 @@ public sealed class SettingsService : ISettingsService
         {
             if (!File.Exists(settingsPath))
             {
-                return new AppSettings();
+                return CreateDefaultSettings();
             }
 
             string json = File.ReadAllText(settingsPath);
             AppSettings? settings = System.Text.Json.JsonSerializer.Deserialize(
                 json,
                 PanosseJsonContext.Default.AppSettings);
-            return settings ?? new AppSettings();
+            AppSettings loaded = settings ?? CreateDefaultSettings();
+            if (MigrateIfNeeded(loaded))
+            {
+                Save(loaded);
+            }
+
+            return loaded;
         }
         catch
         {
-            return new AppSettings();
+            return CreateDefaultSettings();
         }
     }
 
@@ -39,6 +45,7 @@ public sealed class SettingsService : ISettingsService
     {
         try
         {
+            settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
             string? directory = Path.GetDirectoryName(settingsPath);
             if (!string.IsNullOrWhiteSpace(directory))
             {
@@ -55,4 +62,42 @@ public sealed class SettingsService : ISettingsService
             // Rester silencieux pour ne pas bloquer l'app.
         }
     }
+
+    internal static bool MigrateIfNeeded(AppSettings settings)
+    {
+        int from = settings.SchemaVersion;
+        if (from >= AppSettings.CurrentSchemaVersion)
+        {
+            // Still normalize volatile fields for safety.
+            Normalize(settings);
+            return false;
+        }
+
+        // v0 -> v1: clamp schedule, normalize profile, drop obsolete expander fields (already ignored).
+        if (from < 1)
+        {
+            Normalize(settings);
+            settings.SchemaVersion = 1;
+        }
+
+        settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
+        return true;
+    }
+
+    private static void Normalize(AppSettings settings)
+    {
+        if (settings.ScheduledCleanupIntervalHours < 1)
+        {
+            settings.ScheduledCleanupIntervalHours = 24;
+        }
+
+        settings.CleanupProfile = CleanupProfiles.Normalize(settings.CleanupProfile);
+        settings.ExclusionPatterns ??= string.Empty;
+    }
+
+    private static AppSettings CreateDefaultSettings() =>
+        new()
+        {
+            SchemaVersion = AppSettings.CurrentSchemaVersion
+        };
 }

@@ -34,7 +34,7 @@ namespace Panosse.WinUI
             {
                 ShowMessageBox(
                     "Panosse est déjà active dans la barre des tâches.\n\n" +
-                    "Astuce : double-cliquez sur l'icône dans la zone de notification pour afficher la fenêtre.",
+                    "Astuce : cliquez sur l'icône dans la zone de notification pour afficher la fenêtre.",
                     "Panosse - Déjà active");
                 Environment.Exit(0);
             }
@@ -133,6 +133,7 @@ namespace Panosse.WinUI
             services.AddSingleton<IBrowserProcessService, BrowserProcessService>();
             services.AddSingleton<IUpdateService, UpdateService>();
             services.AddSingleton<IUpdateOrchestrator, UpdateOrchestrator>();
+            services.AddSingleton<IDiagnosticsService, DiagnosticsService>();
             services.AddSingleton<ShellViewModel>();
             services.AddSingleton<ISystemTrayService, SystemTrayService>();
             services.AddSingleton<IGlobalHotkeyService, GlobalHotkeyService>();
@@ -184,6 +185,10 @@ namespace Panosse.WinUI
             // Closed ne doit plus disposer tray/hotkey : la fenêtre se masque via Closing.
         }
 
+        private const int SwHide = 0;
+        private const int SwShow = 5;
+        private const int SwRestore = 9;
+
         private void HideMainWindow()
         {
             if (window == null)
@@ -203,7 +208,9 @@ namespace Panosse.WinUI
             }
 
             IntPtr hWnd = WindowNative.GetWindowHandle(window);
+            _ = ShowWindow(hWnd, SwRestore);
             _ = ShowWindow(hWnd, SwShow);
+            _ = SetForegroundWindow(hWnd);
             window.Activate();
         }
 
@@ -252,8 +259,8 @@ namespace Panosse.WinUI
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
-        private const int SwHide = 0;
-        private const int SwShow = 5;
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         private static void ShowMessageBox(string text, string caption)
         {

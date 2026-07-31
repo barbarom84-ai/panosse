@@ -1,6 +1,6 @@
 # Sync Windows Uninstall DisplayVersion/DisplayName for Panosse (requires admin).
 param(
-    [string]$Version = "2.2.9"
+    [string]$Version = "2.3.0"
 )
 
 $ErrorActionPreference = 'Stop'

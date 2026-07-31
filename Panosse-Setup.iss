@@ -4,7 +4,7 @@
 
 #define MyAppName "Panosse"
 #ifndef MyAppVersion
-#define MyAppVersion "2.2.9"
+#define MyAppVersion "2.3.0"
 #endif
 #define MyAppPublisher "Marco Barbaro"
 #define MyAppURL "https://github.com/barbarom84-ai/panosse"
@@ -149,11 +149,11 @@ english.AutoStartProgram=Start %1 with Windows (recommended for Ctrl+Alt+P hotke
 [Messages]
 ; Messages personnalisés en français
 french.WelcomeLabel1=Bienvenue dans l'assistant d'installation de [name]
-french.WelcomeLabel2=Ceci installera [name/ver] sur votre ordinateur.%n%nPanosse est une application de nettoyage automatique qui vous aide à garder votre PC propre et rapide.%n%nNOUVEAUTÉS v2.2.9 :%n  - Profils Rapide / Standard / Profond%n  - Avertissements de risque renforcés en mode Profond%n  - Aperçu filtré selon le profil choisi%n%nIl est recommandé de fermer toutes les autres applications avant de continuer.
+french.WelcomeLabel2=Ceci installera [name/ver] sur votre ordinateur.%n%nPanosse est une application de nettoyage automatique qui vous aide à garder votre PC propre et rapide.%n%nNOUVEAUTÉS v2.3.0 :%n  - Fix clic tray pour rouvrir la fenêtre%n  - Diagnostics, annulation du nettoyage%n  - Settings versionnés + statut MAJ clarifié%n%nIl est recommandé de fermer toutes les autres applications avant de continuer.
 french.FinishedHeadingLabel=Installation de [name] terminée
 french.FinishedLabelNoIcons=L'installation de [name] est terminée.
 french.FinishedLabel=L'installation de [name] est terminée. L'application peut être lancée en cliquant sur les icônes installées.
 french.ClickFinish=Cliquez sur Terminer pour quitter l'assistant d'installation.
 
-english.WelcomeLabel2=This will install [name/ver] on your computer.%n%nPanosse is an automatic cleaning application that helps keep your PC clean and fast.%n%nWHAT'S NEW in v2.2.9:%n  - Rapid / Standard / Deep cleanup profiles%n  - Stronger risk warnings in Deep mode%n  - Preview filtered by selected profile%n%nIt is recommended that you close all other applications before continuing.
+english.WelcomeLabel2=This will install [name/ver] on your computer.%n%nPanosse is an automatic cleaning application that helps keep your PC clean and fast.%n%nWHAT'S NEW in v2.3.0:%n  - Tray click restores the window%n  - Diagnostics, cleanup cancellation%n  - Versioned settings + clearer update status%n%nIt is recommended that you close all other applications before continuing.
 

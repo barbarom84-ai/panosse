@@ -8,7 +8,12 @@ public sealed class SystemTrayService : ISystemTrayService
     private const uint TrayMessage = WmApp + 100;
     private const uint WmCommand = 0x0111;
     private const uint WmRButtonUp = 0x0205;
+    private const uint WmLButtonUp = 0x0202;
     private const uint WmLButtonDblClk = 0x0203;
+    private const uint WmContextMenu = 0x007B;
+    // NOTIFYICON_VERSION_4 notifications (LOWORD of lParam).
+    private const uint NinSelect = 0x0400;
+    private const uint NinKeySelect = 0x0401;
 
     private const uint NifMessage = 0x00000001;
     private const uint NifIcon = 0x00000002;
@@ -102,15 +107,20 @@ public sealed class SystemTrayService : ISystemTrayService
     {
         if (msg == TrayMessage)
         {
-            uint eventId = unchecked((uint)lParam.ToInt32());
-            if (eventId == WmLButtonDblClk)
+            // NOTIFYICON_VERSION_4 packs: LOWORD(lParam)=event, HIWORD(lParam)=icon id.
+            uint eventId = unchecked((uint)(lParam.ToInt64() & 0xFFFF));
+            if (eventId == WmLButtonDblClk ||
+                eventId == NinSelect ||
+                eventId == NinKeySelect ||
+                eventId == WmLButtonUp)
             {
                 onShowRequested?.Invoke();
             }
-            else if (eventId == WmRButtonUp)
+            else if (eventId == WmRButtonUp || eventId == WmContextMenu)
             {
                 ShowContextMenu(windowHandle);
             }
+
             return IntPtr.Zero;
         }
 

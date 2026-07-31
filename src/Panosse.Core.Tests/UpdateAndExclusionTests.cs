@@ -98,3 +98,54 @@ public class CleanupProfileTests
         Assert.Equal(CleanupProfiles.Deep, CleanupProfiles.FromIndex(2));
     }
 }
+
+public class SettingsMigrationTests
+{
+    [Fact]
+    public void MigrateIfNeeded_UpgradesSchemaZeroAndNormalizes()
+    {
+        var settings = new AppSettings
+        {
+            SchemaVersion = 0,
+            ScheduledCleanupIntervalHours = 0,
+            CleanupProfile = "profond"
+        };
+
+        bool migrated = SettingsService.MigrateIfNeeded(settings);
+
+        Assert.True(migrated);
+        Assert.Equal(AppSettings.CurrentSchemaVersion, settings.SchemaVersion);
+        Assert.Equal(24, settings.ScheduledCleanupIntervalHours);
+        Assert.Equal(CleanupProfiles.Deep, settings.CleanupProfile);
+    }
+
+    [Fact]
+    public void MigrateIfNeeded_CurrentSchema_ReturnsFalse()
+    {
+        var settings = new AppSettings
+        {
+            SchemaVersion = AppSettings.CurrentSchemaVersion,
+            CleanupProfile = CleanupProfiles.Standard,
+            ScheduledCleanupIntervalHours = 12
+        };
+
+        bool migrated = SettingsService.MigrateIfNeeded(settings);
+
+        Assert.False(migrated);
+        Assert.Equal(12, settings.ScheduledCleanupIntervalHours);
+    }
+}
+
+public class DiagnosticsServiceTests
+{
+    [Fact]
+    public void RunChecks_ReturnsAtLeastAdminAndTemp()
+    {
+        var service = new DiagnosticsService();
+        IReadOnlyList<DiagnosticItem> items = service.RunChecks();
+
+        Assert.Contains(items, i => i.Name.Contains("administrateur", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(items, i => i.Name.Contains("Temp", StringComparison.OrdinalIgnoreCase));
+        Assert.All(items, i => Assert.False(string.IsNullOrWhiteSpace(i.DisplayLine)));
+    }
+}

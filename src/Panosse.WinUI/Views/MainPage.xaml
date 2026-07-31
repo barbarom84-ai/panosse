@@ -209,6 +209,12 @@
                 </ListViewItem>
                 <ListViewItem>
                     <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" />
+                        <TextBlock Text="Diagnostics" FontSize="14" VerticalAlignment="Center" />
+                    </StackPanel>
+                </ListViewItem>
+                <ListViewItem>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
                         <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" />
                         <TextBlock Text="À propos" FontSize="14" VerticalAlignment="Center" />
                     </StackPanel>
@@ -371,6 +377,11 @@
                                          Background="{StaticResource AppBorderColor}"
                                          CornerRadius="3"
                                          Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <Button Content="Annuler"
+                                    Command="{x:Bind ViewModel.CancelCleanupCommand}"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    HorizontalAlignment="Left"
+                                    Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <ItemsControl x:Name="TaskMessagesList"
                                           ItemsSource="{x:Bind ViewModel.TaskMessages, Mode=OneWay}"
                                           HorizontalAlignment="Stretch">
@@ -538,6 +549,40 @@
                 </StackPanel>
             </ScrollViewer>
 
+            <!-- ============ DIAGNOSTICS ============ -->
+            <ScrollViewer x:Name="DiagnosticsPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="24,20">
+                <StackPanel Spacing="16" MaxWidth="620">
+                    <TextBlock Text="Diagnostics"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AppTextColor}" />
+                    <TextBlock Text="Vérifie les droits et l'accès aux dossiers utilisés par le nettoyage."
+                               FontSize="13"
+                               Foreground="{StaticResource AppSubtextColor}"
+                               TextWrapping="WrapWholeWords" />
+                    <Button Content="Lancer les diagnostics"
+                            Command="{x:Bind ViewModel.RunDiagnosticsCommand}"
+                            Style="{StaticResource PrimaryActionButtonStyle}"
+                            HorizontalAlignment="Left" />
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <ListView ItemsSource="{x:Bind ViewModel.DiagnosticItems, Mode=OneWay}"
+                                  SelectionMode="None"
+                                  MaxHeight="440"
+                                  HorizontalAlignment="Stretch">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="sys:String">
+                                    <TextBlock Text="{x:Bind}"
+                                               Foreground="{StaticResource AppTextColor}"
+                                               FontSize="13"
+                                               TextWrapping="WrapWholeWords"
+                                               Margin="0,6" />
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
             <!-- ============ À PROPOS ============ -->
             <ScrollViewer x:Name="AboutPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="24,20">
                 <StackPanel Spacing="16" MaxWidth="620">
@@ -567,7 +612,15 @@
                                     Style="{StaticResource AboutUpdateButtonStyle}"
                                     HorizontalAlignment="Center"
                                     MinWidth="240"
-                                    Margin="0,0,0,12" />
+                                    Margin="0,0,0,8"
+                                    IsEnabled="{x:Bind ViewModel.CanCheckUpdates, Mode=OneWay}" />
+                            <TextBlock Text="{x:Bind ViewModel.UpdatePhaseText, Mode=OneWay}"
+                                       FontSize="13"
+                                       Foreground="{StaticResource AppTextColor}"
+                                       TextWrapping="WrapWholeWords"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,6" />
                             <TextBlock x:Name="AboutLastCheckText"
                                        Text="Dernière vérification : jamais"
                                        FontSize="12"
