@@ -18,6 +18,7 @@ namespace Panosse.WinUI.Views
     public partial class MainPage : Page
     {
         public ShellViewModel ViewModel { get; }
+        public DriversViewModel DriversViewModel { get; }
         public string AppVersionText { get; } = $"v{Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.0.0"}";
         private readonly IBrowserProcessService browserProcessService;
         private List<string> navigateursEnCours = new();
@@ -33,6 +34,10 @@ namespace Panosse.WinUI.Views
                 _ = DispatcherQueue.TryEnqueue(() => action());
             };
             ViewModel.ConfirmCleanupAsync = ConfirmCleanupAsync;
+            ViewModel.ConfirmActionAsync = ConfirmActionAsync;
+            DriversViewModel = App.GetRequiredService<DriversViewModel>();
+            DriversViewModel.ConfirmActionAsync = ConfirmActionAsync;
+            DriversViewModel.RequestElevatedRestart = () => ((App)Application.Current).TryRestartElevated();
             InitializeComponent();
             this.Loaded += MainPage_Loaded;
             this.KeyDown += MainPage_KeyDown;
@@ -45,8 +50,14 @@ namespace Panosse.WinUI.Views
             DisplayLayoutHelper.ApplyUserScalePercent(ViewModel.UiScalePercent);
             DisplayLayoutHelper.ApplyWindowSize(App.MainWindow);
             ViewModel.UiScaleChanged += ViewModel_UiScaleChanged;
-            NavList.SelectedIndex = 0;
+            bool resumeDriverCleanup = DriversViewModel.HasPendingCleanup;
+            NavList.SelectedIndex = resumeDriverCleanup ? 1 : 0;
             UpdateMopAnimation();
+            if (resumeDriverCleanup)
+            {
+                await DriversViewModel.ResumePendingCleanupAsync();
+            }
+
             await CheckBrowsersAsync();
 
             if (ViewModel.CheckUpdatesOnStartup)
@@ -140,17 +151,18 @@ namespace Panosse.WinUI.Views
             }
 
             HomePanel.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
-            SettingsPanel.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
-            HistoryPanel.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
-            DiagnosticsPanel.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
-            AboutPanel.Visibility = index == 4 ? Visibility.Visible : Visibility.Collapsed;
+            DriversPanel.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
+            SettingsPanel.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
+            HistoryPanel.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
+            DiagnosticsPanel.Visibility = index == 4 ? Visibility.Visible : Visibility.Collapsed;
+            AboutPanel.Visibility = index == 5 ? Visibility.Visible : Visibility.Collapsed;
 
-            if (index == 1 || index == 2)
+            if (index == 2 || index == 3)
             {
                 ViewModel.RefreshHistoryCommand.Execute(null);
             }
 
-            if (index == 3 && ViewModel.DiagnosticItems.Count == 0)
+            if (index == 4 && ViewModel.DiagnosticItems.Count == 0)
             {
                 ViewModel.RunDiagnosticsCommand.Execute(null);
             }
@@ -195,18 +207,21 @@ namespace Panosse.WinUI.Views
             }
         }
 
-        private async Task<bool> ConfirmCleanupAsync(string message)
+        private Task<bool> ConfirmCleanupAsync(string message) =>
+            ConfirmActionAsync("Confirmer le nettoyage", message, "Nettoyer");
+
+        private async Task<bool> ConfirmActionAsync(string title, string message, string primaryButtonText)
         {
             var dialog = new ContentDialog
             {
-                Title = "Confirmer le nettoyage",
+                Title = title,
                 Content = new TextBlock
                 {
                     Text = message,
                     TextWrapping = TextWrapping.WrapWholeWords,
                     MaxWidth = 420
                 },
-                PrimaryButtonText = "Nettoyer",
+                PrimaryButtonText = primaryButtonText,
                 CloseButtonText = "Annuler",
                 DefaultButton = ContentDialogButton.Primary,
                 XamlRoot = XamlRoot

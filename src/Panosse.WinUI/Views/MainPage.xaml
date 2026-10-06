@@ -9,6 +9,7 @@
     xmlns:local="using:Panosse.WinUI"
     xmlns:converters="using:Panosse.WinUI.Converters"
     xmlns:sys="using:System"
+    xmlns:vm="using:Panosse.Core.ViewModels"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
@@ -137,6 +138,30 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
+        <!-- Suppression de pilotes : action destructive, mise en avant en rouge -->
+        <SolidColorBrush x:Key="AppDangerColor" Color="#D32F2F" />
+        <SolidColorBrush x:Key="AppDangerSoftColor" Color="#FDECEA" />
+        <Style x:Key="DangerActionButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource AppDangerColor}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="20,10"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style x:Key="RowDeleteButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource AppDangerSoftColor}"/>
+            <Setter Property="Foreground" Value="{StaticResource AppDangerColor}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
         <!-- Style vert pour le bouton de vérification des mises à jour (À propos) -->
         <Style x:Key="AboutUpdateButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="{StaticResource AppSuccessColor}"/>
@@ -145,7 +170,7 @@
             <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="Padding" Value="12,8"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontSize" Value="12"/>
         </Style>
 
         <!-- Style d'item de navigation (sidebar) -->
@@ -157,13 +182,74 @@
             <Setter Property="Foreground" Value="{StaticResource AppTextColor}" />
         </Style>
 
+        <Style x:Key="NavTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- Page Pilotes -->
+        <Style x:Key="PageTitleTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource AppTextColor}" />
+        </Style>
+        <Style x:Key="PageSubtitleTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{StaticResource AppSubtextColor}" />
+            <Setter Property="TextWrapping" Value="WrapWholeWords" />
+        </Style>
+        <Style x:Key="SectionTitleTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource AppTextColor}" />
+        </Style>
+        <Style x:Key="ItemTitleTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource AppTextColor}" />
+            <Setter Property="TextWrapping" Value="WrapWholeWords" />
+        </Style>
+        <Style x:Key="ItemDetailTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{StaticResource AppSubtextColor}" />
+            <Setter Property="TextWrapping" Value="WrapWholeWords" />
+        </Style>
+        <Style x:Key="BadgeBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource AppSidebarSelectedColor}" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+        </Style>
+        <Style x:Key="BadgeTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource AppPrimaryPressedColor}" />
+        </Style>
+        <Style x:Key="RiskTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource AppMutedTextColor}" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+        </Style>
+        <Style x:Key="NoticeBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="#FFF8E1" />
+            <Setter Property="BorderBrush" Value="{StaticResource AppWarningColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="16,12" />
+        </Style>
+        <Style x:Key="ItemCheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <converters:TaskMessageBrushConverter x:Key="TaskMessageBrushConverter" />
     </Page.Resources>
 
     <Grid Background="{StaticResource AppBackgroundColor}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="210" />
+            <ColumnDefinition Width="230" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -192,31 +278,37 @@
                 <ListViewItem>
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" />
-                        <TextBlock Text="Accueil" FontSize="14" VerticalAlignment="Center" />
+                        <TextBlock Text="Accueil" Style="{StaticResource NavTextStyle}" />
+                    </StackPanel>
+                </ListViewItem>
+                <ListViewItem>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="&#xE772;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" />
+                        <TextBlock Text="Pilotes" Style="{StaticResource NavTextStyle}" />
                     </StackPanel>
                 </ListViewItem>
                 <ListViewItem>
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" />
-                        <TextBlock Text="Paramètres" FontSize="14" VerticalAlignment="Center" />
+                        <TextBlock Text="Paramètres" Style="{StaticResource NavTextStyle}" />
                     </StackPanel>
                 </ListViewItem>
                 <ListViewItem>
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" />
-                        <TextBlock Text="Historique" FontSize="14" VerticalAlignment="Center" />
+                        <TextBlock Text="Historique" Style="{StaticResource NavTextStyle}" />
                     </StackPanel>
                 </ListViewItem>
                 <ListViewItem>
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" />
-                        <TextBlock Text="Diagnostics" FontSize="14" VerticalAlignment="Center" />
+                        <TextBlock Text="Diagnostics" Style="{StaticResource NavTextStyle}" />
                     </StackPanel>
                 </ListViewItem>
                 <ListViewItem>
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" />
-                        <TextBlock Text="À propos" FontSize="14" VerticalAlignment="Center" />
+                        <TextBlock Text="À propos" Style="{StaticResource NavTextStyle}" />
                     </StackPanel>
                 </ListViewItem>
             </ListView>
@@ -228,7 +320,7 @@
                     Margin="16,8,16,20">
                 <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
                     <TextBlock Text="&#xE7E8;" FontFamily="Segoe MDL2 Assets" FontSize="15" VerticalAlignment="Center" />
-                    <TextBlock Text="Quitter" FontSize="14" VerticalAlignment="Center" />
+                    <TextBlock Text="Quitter" Style="{StaticResource NavTextStyle}" />
                 </StackPanel>
             </Button>
         </Grid>
@@ -238,7 +330,7 @@
 
             <!-- ============ ACCUEIL ============ -->
             <ScrollViewer x:Name="HomePanel" VerticalScrollBarVisibility="Auto" Padding="24,20">
-                <StackPanel Spacing="16" MaxWidth="620" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="16" MaxWidth="860" HorizontalAlignment="Stretch">
 
                     <!-- Carte Boost (dominante) -->
                     <Border Style="{StaticResource CardBorderStyle}" Padding="28,26">
@@ -251,7 +343,7 @@
                                            HorizontalAlignment="Center"
                                            TextAlignment="Center" />
                                 <TextBlock Text="Nettoyez les fichiers temporaires et libérez de l'espace en un clic."
-                                           FontSize="13"
+                                           FontSize="14"
                                            Foreground="{StaticResource AppSubtextColor}"
                                            TextWrapping="WrapWholeWords"
                                            TextAlignment="Center"
@@ -259,7 +351,7 @@
                                            MaxWidth="360" />
                                 <StackPanel Spacing="6" HorizontalAlignment="Center" Margin="0,4,0,0">
                                     <TextBlock Text="Profil de nettoyage"
-                                               FontSize="12"
+                                               FontSize="13"
                                                Foreground="{StaticResource AppSubtextColor}"
                                                HorizontalAlignment="Center" />
                                     <ComboBox Width="220"
@@ -270,7 +362,7 @@
                                         <ComboBoxItem Content="Profond" />
                                     </ComboBox>
                                     <TextBlock Text="{x:Bind ViewModel.CleanupProfileDescription, Mode=OneWay}"
-                                               FontSize="12"
+                                               FontSize="13"
                                                Foreground="{StaticResource AppMutedTextColor}"
                                                TextWrapping="WrapWholeWords"
                                                TextAlignment="Center"
@@ -304,7 +396,7 @@
                                 <HyperlinkButton Content="Aperçu du nettoyage"
                                                  Command="{x:Bind ViewModel.RunPreviewCommand}"
                                                  HorizontalAlignment="Center"
-                                                 FontSize="13"
+                                                 FontSize="14"
                                                  AutomationProperties.Name="Aperçu du nettoyage" />
                             </StackPanel>
 
@@ -317,7 +409,7 @@
                                              MaxWidth="520">
                                 <TextBlock Text="⚠️ Veuillez fermer Edge pour un nettoyage complet (cliquez ici pour fermer automatiquement)"
                                            Foreground="{StaticResource AppWarningColor}"
-                                           FontSize="13"
+                                           FontSize="14"
                                            TextWrapping="WrapWholeWords"
                                            TextAlignment="Center"
                                            TextDecorations="Underline" />
@@ -337,7 +429,7 @@
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource AppTextColor}" />
                             <TextBlock Text="{x:Bind ViewModel.PreviewRiskSummary, Mode=OneWay}"
-                                       FontSize="12"
+                                       FontSize="13"
                                        Foreground="{StaticResource AppWarningColor}"
                                        TextWrapping="WrapWholeWords" />
                             <ItemsControl ItemsSource="{x:Bind ViewModel.PreviewItems, Mode=OneWay}">
@@ -345,7 +437,7 @@
                                     <DataTemplate x:DataType="sys:String">
                                         <TextBlock Text="{x:Bind}"
                                                    Foreground="{StaticResource AppTextColor}"
-                                                   FontSize="13"
+                                                   FontSize="14"
                                                    TextWrapping="WrapWholeWords"
                                                    Margin="0,2,0,2" />
                                     </DataTemplate>
@@ -391,7 +483,7 @@
                                     <DataTemplate x:DataType="sys:String">
                                         <TextBlock Text="{x:Bind}"
                                                    Foreground="{Binding Converter={StaticResource TaskMessageBrushConverter}}"
-                                                   FontSize="13"
+                                                   FontSize="14"
                                                    FontWeight="SemiBold"
                                                    TextWrapping="WrapWholeWords"
                                                    Margin="0,2,0,2" />
@@ -426,9 +518,150 @@
                 </StackPanel>
             </ScrollViewer>
 
+            <!-- ============ PILOTES ============ -->
+            <ScrollViewer x:Name="DriversPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="24,20">
+                <StackPanel Spacing="16" MaxWidth="860">
+                    <TextBlock Text="Pilotes" Style="{StaticResource PageTitleTextStyle}" />
+                    <TextBlock Text="Repère les anciennes versions de pilotes remplacées, les pilotes que plus aucun périphérique n'utilise et les périphériques cachés débranchés depuis longtemps."
+                               Style="{StaticResource PageSubtitleTextStyle}" />
+
+                    <Border Style="{StaticResource NoticeBorderStyle}"
+                            Visibility="{x:Bind DriversViewModel.ShowElevationNotice, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Supprimer des pilotes demande les droits administrateur. Pas d'inquiétude : en cliquant sur « Supprimer », Panosse les demande à Windows puis termine la suppression tout seul."
+                                       Style="{StaticResource ItemDetailTextStyle}"
+                                       VerticalAlignment="Center" />
+                            <Button Grid.Column="1"
+                                    Content="Relancer en administrateur"
+                                    Command="{x:Bind DriversViewModel.RestartAsAdminCommand}"
+                                    Style="{StaticResource PrimaryActionButtonStyle}" />
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Button Content="Analyser les pilotes"
+                                        Command="{x:Bind DriversViewModel.ScanCommand}"
+                                        Style="{StaticResource PrimaryActionButtonStyle}" />
+                                <TextBlock Grid.Column="1"
+                                           Text="Périphériques absents depuis plus de"
+                                           Style="{StaticResource ItemDetailTextStyle}"
+                                           TextAlignment="Right"
+                                           VerticalAlignment="Center" />
+                                <ComboBox Grid.Column="2"
+                                          SelectedIndex="{x:Bind DriversViewModel.MinimumAgeIndex, Mode=TwoWay}"
+                                          MinWidth="130"
+                                          VerticalAlignment="Center">
+                                    <ComboBoxItem Content="30 jours" />
+                                    <ComboBoxItem Content="90 jours" />
+                                    <ComboBoxItem Content="6 mois" />
+                                    <ComboBoxItem Content="1 an" />
+                                </ComboBox>
+                            </Grid>
+                            <ProgressBar IsIndeterminate="True"
+                                         Visibility="{x:Bind DriversViewModel.IsBusy, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <TextBlock Text="{x:Bind DriversViewModel.StatusText, Mode=OneWay}"
+                                       Style="{StaticResource ItemDetailTextStyle}" />
+                            <TextBlock Text="{x:Bind DriversViewModel.SummaryText, Mode=OneWay}"
+                                       Style="{StaticResource ItemTitleTextStyle}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorderStyle}"
+                            Visibility="{x:Bind DriversViewModel.HasItems, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel Spacing="10">
+                            <Button Content="{x:Bind DriversViewModel.DeleteSelectedText, Mode=OneWay}"
+                                    Command="{x:Bind DriversViewModel.CleanSelectedCommand}"
+                                    Style="{StaticResource DangerActionButtonStyle}" />
+                            <TextBlock Text="{x:Bind DriversViewModel.DeleteHintText}"
+                                       Style="{StaticResource ItemDetailTextStyle}" />
+
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{x:Bind DriversViewModel.SelectionText, Mode=OneWay}"
+                                           Style="{StaticResource ItemDetailTextStyle}"
+                                           VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Sélection recommandée"
+                                            Command="{x:Bind DriversViewModel.SelectRecommendedCommand}"
+                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                    <Button Content="Tout désélectionner"
+                                            Command="{x:Bind DriversViewModel.SelectNoneCommand}"
+                                            Style="{StaticResource SecondaryButtonStyle}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <ListView ItemsSource="{x:Bind DriversViewModel.Items}"
+                                      SelectionMode="None"
+                                      MaxHeight="360"
+                                      HorizontalAlignment="Stretch">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DriverIssueItem">
+                                        <Grid ColumnSpacing="10" Padding="0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
+                                                      Style="{StaticResource ItemCheckBoxStyle}" />
+                                            <StackPanel Grid.Column="1" Spacing="2">
+                                                <TextBlock Text="{x:Bind Title}" Style="{StaticResource ItemTitleTextStyle}" />
+                                                <TextBlock Text="{x:Bind Details}" Style="{StaticResource ItemDetailTextStyle}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Spacing="4">
+                                                <Border Style="{StaticResource BadgeBorderStyle}">
+                                                    <TextBlock Text="{x:Bind KindLabel}" Style="{StaticResource BadgeTextStyle}" />
+                                                </Border>
+                                                <TextBlock Text="{x:Bind RiskLabel}" Style="{StaticResource RiskTextStyle}" />
+                                            </StackPanel>
+                                            <Button Grid.Column="3"
+                                                    Content="🗑️ Supprimer"
+                                                    Command="{x:Bind DeleteCommand}"
+                                                    ToolTipService.ToolTip="Supprimer uniquement cet élément"
+                                                    Style="{StaticResource RowDeleteButtonStyle}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Sauvegardes des pilotes" Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock Text="{x:Bind DriversViewModel.BackupStatus, Mode=OneWay}"
+                                       Style="{StaticResource PageSubtitleTextStyle}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Restaurer la dernière sauvegarde"
+                                        Command="{x:Bind DriversViewModel.RestoreLatestBackupCommand}"
+                                        Style="{StaticResource PrimaryActionButtonStyle}" />
+                                <Button Content="Ouvrir le dossier"
+                                        Command="{x:Bind DriversViewModel.OpenBackupsCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
             <!-- ============ PARAMÈTRES ============ -->
             <ScrollViewer x:Name="SettingsPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="24,20">
-                <StackPanel Spacing="16" MaxWidth="620">
+                <StackPanel Spacing="16" MaxWidth="860">
                     <TextBlock Text="Paramètres"
                                FontSize="24"
                                FontWeight="SemiBold"
@@ -454,7 +687,7 @@
                                       Foreground="{StaticResource AppTextColor}" />
 
                             <TextBlock Text="Échelle de l'interface"
-                                       FontSize="12"
+                                       FontSize="13"
                                        Foreground="{StaticResource AppSubtextColor}" />
                             <ComboBox Width="220"
                                       HorizontalAlignment="Left"
@@ -466,13 +699,13 @@
                             </ComboBox>
 
                             <TextBlock Text="Exclusions intelligentes (mots-clés, séparés par virgules)"
-                                       FontSize="12"
+                                       FontSize="13"
                                        Foreground="{StaticResource AppSubtextColor}" />
                             <TextBox Foreground="{StaticResource AppTextColor}"
                                      Background="{StaticResource AppCardColor}"
                                      BorderBrush="{StaticResource AppBorderColor}"
                                      BorderThickness="1"
-                                     FontSize="13"
+                                     FontSize="14"
                                      MinHeight="32"
                                      Padding="10,6"
                                      Text="{x:Bind ViewModel.ExclusionPatterns, Mode=TwoWay}"
@@ -485,13 +718,13 @@
 
                             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                 <TextBlock Text="Intervalle (heures):"
-                                           FontSize="13"
+                                           FontSize="14"
                                            Foreground="{StaticResource AppSubtextColor}"
                                            VerticalAlignment="Center" />
                                 <TextBox Width="72"
                                          MinHeight="30"
                                          Padding="8,4"
-                                         FontSize="13"
+                                         FontSize="14"
                                          Foreground="{StaticResource AppTextColor}"
                                          Background="{StaticResource AppCardColor}"
                                          BorderBrush="{StaticResource AppBorderColor}"
@@ -500,17 +733,17 @@
                             </StackPanel>
 
                             <TextBlock Text="{x:Bind ViewModel.SchedulerStatusText, Mode=OneWay}"
-                                       FontSize="12"
+                                       FontSize="13"
                                        Foreground="{StaticResource AppMutedTextColor}"
                                        TextWrapping="WrapWholeWords" />
 
                             <TextBlock Text="{x:Bind ViewModel.HistorySummary, Mode=OneWay}"
-                                       FontSize="12"
+                                       FontSize="13"
                                        Foreground="{StaticResource AppMutedTextColor}"
                                        TextWrapping="WrapWholeWords" />
 
                             <TextBlock Text="Ces préférences sont sauvegardées automatiquement."
-                                       FontSize="12"
+                                       FontSize="13"
                                        Foreground="{StaticResource AppMutedTextColor}"
                                        TextWrapping="WrapWholeWords" />
 
@@ -526,7 +759,7 @@
 
             <!-- ============ HISTORIQUE ============ -->
             <ScrollViewer x:Name="HistoryPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="24,20">
-                <StackPanel Spacing="16" MaxWidth="620">
+                <StackPanel Spacing="16" MaxWidth="860">
                     <TextBlock Text="Historique"
                                FontSize="24"
                                FontWeight="SemiBold"
@@ -553,25 +786,46 @@
                                 <DataTemplate x:DataType="sys:String">
                                     <TextBlock Text="{x:Bind}"
                                                Foreground="{StaticResource AppTextColor}"
-                                               FontSize="13"
+                                               FontSize="14"
                                                TextWrapping="WrapWholeWords"
                                                Margin="0,6" />
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
                     </Border>
+
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Sauvegardes du registre"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource AppTextColor}" />
+                            <TextBlock Text="{x:Bind ViewModel.RegistryBackupStatus, Mode=OneWay}"
+                                       FontSize="14"
+                                       Foreground="{StaticResource AppSubtextColor}"
+                                       TextWrapping="WrapWholeWords" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Restaurer la dernière sauvegarde"
+                                        Command="{x:Bind ViewModel.RestoreRegistryBackupCommand}"
+                                        Style="{StaticResource PrimaryActionButtonStyle}" />
+                                <Button Content="Ouvrir le dossier"
+                                        Command="{x:Bind ViewModel.OpenRegistryBackupsCommand}"
+                                        Style="{StaticResource SecondaryButtonStyle}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
 
             <!-- ============ DIAGNOSTICS ============ -->
             <ScrollViewer x:Name="DiagnosticsPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="24,20">
-                <StackPanel Spacing="16" MaxWidth="620">
+                <StackPanel Spacing="16" MaxWidth="860">
                     <TextBlock Text="Diagnostics"
                                FontSize="24"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource AppTextColor}" />
                     <TextBlock Text="Vérifie les droits et l'accès aux dossiers utilisés par le nettoyage."
-                               FontSize="13"
+                               FontSize="14"
                                Foreground="{StaticResource AppSubtextColor}"
                                TextWrapping="WrapWholeWords" />
                     <Button Content="Lancer les diagnostics"
@@ -587,7 +841,7 @@
                                 <DataTemplate x:DataType="sys:String">
                                     <TextBlock Text="{x:Bind}"
                                                Foreground="{StaticResource AppTextColor}"
-                                               FontSize="13"
+                                               FontSize="14"
                                                TextWrapping="WrapWholeWords"
                                                Margin="0,6" />
                                 </DataTemplate>
@@ -599,7 +853,7 @@
 
             <!-- ============ À PROPOS ============ -->
             <ScrollViewer x:Name="AboutPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" Padding="24,20">
-                <StackPanel Spacing="16" MaxWidth="620">
+                <StackPanel Spacing="16" MaxWidth="860">
                     <TextBlock Text="À propos"
                                FontSize="24"
                                FontWeight="SemiBold"
@@ -629,7 +883,7 @@
                                     Margin="0,0,0,8"
                                     IsEnabled="{x:Bind ViewModel.CanCheckUpdates, Mode=OneWay}" />
                             <TextBlock Text="{x:Bind ViewModel.UpdatePhaseText, Mode=OneWay}"
-                                       FontSize="13"
+                                       FontSize="14"
                                        Foreground="{StaticResource AppTextColor}"
                                        TextWrapping="WrapWholeWords"
                                        TextAlignment="Center"
@@ -637,7 +891,7 @@
                                        Margin="0,0,0,6" />
                             <TextBlock x:Name="AboutLastCheckText"
                                        Text="Dernière vérification : jamais"
-                                       FontSize="12"
+                                       FontSize="13"
                                        Foreground="{StaticResource AppMutedTextColor}"
                                        HorizontalAlignment="Center"
                                        Margin="0,0,0,8" />
@@ -648,7 +902,7 @@
                                         Margin="0,0,0,12"
                                         Visibility="{x:Bind ViewModel.IsUpdateAvailable, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <TextBlock Text="{x:Bind ViewModel.UpdateStatusText, Mode=OneWay}"
-                                           FontSize="13"
+                                           FontSize="14"
                                            Foreground="{StaticResource AppSuccessColor}"
                                            TextWrapping="WrapWholeWords"
                                            TextAlignment="Center" />
@@ -689,7 +943,7 @@
                                     Margin="0,0,0,18" />
 
                             <TextBlock Text="Développé par"
-                                       FontSize="13"
+                                       FontSize="14"
                                        Foreground="{StaticResource AppMutedTextColor}"
                                        HorizontalAlignment="Center"
                                        Margin="0,0,0,4" />

@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using Microsoft.Win32;
 
 namespace Panosse.Services;
 
@@ -163,64 +163,6 @@ public sealed class CleanupService : ICleanupService
         }
     }
 
-    public void CleanRegistry()
-    {
-        try
-        {
-            using RegistryKey? runMru = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU", true);
-            if (runMru != null)
-            {
-                foreach (string valueName in runMru.GetValueNames())
-                {
-                    if (!string.IsNullOrEmpty(valueName))
-                    {
-                        try { runMru.DeleteValue(valueName, false); } catch { }
-                    }
-                }
-            }
-        }
-        catch { }
-
-        try
-        {
-            using RegistryKey? recentDocs = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\RecentDocs", true);
-            if (recentDocs == null)
-            {
-                return;
-            }
-
-            foreach (string valueName in recentDocs.GetValueNames())
-            {
-                if (!string.IsNullOrEmpty(valueName))
-                {
-                    try { recentDocs.DeleteValue(valueName, false); } catch { }
-                }
-            }
-
-            foreach (string subKeyName in recentDocs.GetSubKeyNames())
-            {
-                try
-                {
-                    using RegistryKey? subKey = recentDocs.OpenSubKey(subKeyName, true);
-                    if (subKey == null)
-                    {
-                        continue;
-                    }
-
-                    foreach (string valueName in subKey.GetValueNames())
-                    {
-                        if (!string.IsNullOrEmpty(valueName))
-                        {
-                            try { subKey.DeleteValue(valueName, false); } catch { }
-                        }
-                    }
-                }
-                catch { }
-            }
-        }
-        catch { }
-    }
-
     public long CleanOldDownloads(IEnumerable<string>? exclusionPatterns = null)
     {
         long deletedSize = 0;
@@ -290,59 +232,16 @@ public sealed class CleanupService : ICleanupService
     public long CleanWindowsLogs()
     {
         long deletedSize = 0;
-        try
+        string[] logRoots =
+        [
+            @"C:\Windows\Logs",
+            @"C:\Windows\System32\LogFiles",
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"Microsoft\Windows\Logs")
+        ];
+
+        foreach (string logsPath in logRoots)
         {
-            const string logsPath = @"C:\Windows\Logs";
-            if (!Directory.Exists(logsPath))
-            {
-                return 0;
-            }
-
-            DirectoryInfo logsDir = new DirectoryInfo(logsPath);
-            DateTime threshold = DateTime.Now.AddDays(-7);
-
-            foreach (FileInfo file in logsDir.GetFiles("*.log", SearchOption.AllDirectories))
-            {
-                try
-                {
-                    if (file.LastWriteTime < threshold)
-                    {
-                        long size = file.Length;
-                        file.Delete();
-                        deletedSize += size;
-                    }
-                }
-                catch { }
-            }
-
-            foreach (FileInfo file in logsDir.GetFiles("*.etl", SearchOption.AllDirectories))
-            {
-                try
-                {
-                    if (file.LastWriteTime < threshold)
-                    {
-                        long size = file.Length;
-                        file.Delete();
-                        deletedSize += size;
-                    }
-                }
-                catch { }
-            }
-
-            foreach (FileInfo file in logsDir.GetFiles("*.old", SearchOption.AllDirectories))
-            {
-                try
-                {
-                    long size = file.Length;
-                    file.Delete();
-                    deletedSize += size;
-                }
-                catch { }
-            }
-        }
-        catch
-        {
-            // Ignorer les erreurs d'accès.
+            deletedSize += CleanOldLogFiles(logsPath, olderThanDays: 7);
         }
 
         return deletedSize;
@@ -389,6 +288,173 @@ public sealed class CleanupService : ICleanupService
         }
 
         return deletedSize;
+    }
+
+    public long CleanTemporaryInternetFiles()
+    {
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        long size = 0;
+        size += CleanDirectory(Path.Combine(localAppData, @"Microsoft\Windows\INetCache"));
+        size += CleanDirectory(Path.Combine(localAppData, @"Microsoft\Windows\WebCache"));
+        return size;
+    }
+
+    public long CleanDeliveryOptimization()
+    {
+        long size = 0;
+        string[] cachePaths =
+        [
+            @"C:\Windows\SoftwareDistribution\DeliveryOptimization\Cache",
+            @"C:\Windows\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache",
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                @"Microsoft\Windows\DeliveryOptimization\Cache")
+        ];
+
+        foreach (string path in cachePaths)
+        {
+            size += CleanDirectory(path);
+        }
+
+        return size;
+    }
+
+    public long CleanWindowsErrorReports()
+    {
+        long size = 0;
+        string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+        string[] werPaths =
+        [
+            Path.Combine(programData, @"Microsoft\Windows\WER\ReportQueue"),
+            Path.Combine(programData, @"Microsoft\Windows\WER\ReportArchive"),
+            Path.Combine(programData, @"Microsoft\Windows\WER\Temp"),
+            Path.Combine(localAppData, @"Microsoft\Windows\WER"),
+            Path.Combine(localAppData, @"CrashDumps")
+        ];
+
+        foreach (string path in werPaths)
+        {
+            size += CleanDirectory(path);
+        }
+
+        return size;
+    }
+
+    public long CleanDefenderArtifacts()
+    {
+        long size = 0;
+        string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        string defenderRoot = Path.Combine(programData, @"Microsoft\Windows Defender");
+
+        // Historique / support / quarantaine — pas les définitions actives.
+        string[] paths =
+        [
+            Path.Combine(defenderRoot, @"Scans\History"),
+            Path.Combine(defenderRoot, "Support"),
+            Path.Combine(defenderRoot, "Quarantine"),
+            Path.Combine(programData, @"Microsoft\Windows Defender Network Inspection\Support")
+        ];
+
+        foreach (string path in paths)
+        {
+            size += CleanDirectory(path);
+        }
+
+        return size;
+    }
+
+    public long CleanObsoleteDriverPackages()
+    {
+        // Temp du Driver Store (sûr) + nettoyage CBS des composants / pilotes remplacés via DISM.
+        long size = CleanDirectory(@"C:\Windows\System32\DriverStore\Temp");
+        size += RunDismStartComponentCleanup();
+        return size;
+    }
+
+    private static long CleanOldLogFiles(string logsPath, int olderThanDays)
+    {
+        long deletedSize = 0;
+        try
+        {
+            if (!Directory.Exists(logsPath))
+            {
+                return 0;
+            }
+
+            DirectoryInfo logsDir = new DirectoryInfo(logsPath);
+            DateTime threshold = DateTime.Now.AddDays(-olderThanDays);
+
+            foreach (string pattern in new[] { "*.log", "*.etl", "*.old" })
+            {
+                foreach (FileInfo file in logsDir.GetFiles(pattern, SearchOption.AllDirectories))
+                {
+                    try
+                    {
+                        bool delete = pattern == "*.old" || file.LastWriteTime < threshold;
+                        if (!delete)
+                        {
+                            continue;
+                        }
+
+                        long length = file.Length;
+                        file.Delete();
+                        deletedSize += length;
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch
+        {
+            // Ignorer les erreurs d'accès.
+        }
+
+        return deletedSize;
+    }
+
+    private static long RunDismStartComponentCleanup()
+    {
+        try
+        {
+            string windir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+            string dismPath = Path.Combine(windir, "System32", "dism.exe");
+            if (!File.Exists(dismPath))
+            {
+                return 0;
+            }
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = dismPath,
+                Arguments = "/Online /Cleanup-Image /StartComponentCleanup",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            using Process? process = Process.Start(startInfo);
+            if (process is null)
+            {
+                return 0;
+            }
+
+            // DISM peut prendre plusieurs minutes ; ne pas bloquer indéfiniment.
+            if (!process.WaitForExit(milliseconds: 8 * 60 * 1000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                return 0;
+            }
+
+            // Les octets libérés ne sont pas exposés de façon fiable par DISM.
+            return 0;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     private long CleanDirectory(string path)

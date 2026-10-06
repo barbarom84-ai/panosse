@@ -8,20 +8,57 @@ namespace Panosse.WinUI.Services;
 
 /// <summary>
 /// Calcule une taille de fenêtre adaptée à la zone de travail, au DPI et à l'échelle UI utilisateur.
-/// Taille de référence compacte type PC Manager (~720×680), clampée à la zone utile.
+/// Taille de référence confortable (~1060×820) pour que les pages riches (Pilotes, Historique) tiennent
+/// sans texte ni bouton tronqué, clampée à la zone utile.
 /// </summary>
 internal static class DisplayLayoutHelper
 {
     // Taille de référence à 100 % (pixels effectifs XAML).
-    private const double BaseWidth = 720;
-    private const double BaseHeight = 680;
+    private const double BaseWidth = 1060;
+    private const double BaseHeight = 820;
+
+    // En dessous, la barre latérale et les cartes de 620 px ne tiennent plus côte à côte.
+    private const double MinimumWidth = 940;
+    private const double MinimumHeight = 680;
 
     /// <summary>
     /// User preference multiplier (1.0, 1.1, 1.25). Combined with DPI scale.
     /// </summary>
     public static double UserScale { get; set; } = 1.0;
 
-    public static SizeInt32 CalculateWindowSize(Window window)
+    public static SizeInt32 CalculateWindowSize(Window window) => CalculateSizes(window).Preferred;
+
+    public static void ApplyWindowSize(Window window)
+    {
+        IntPtr hWnd = WindowNative.GetWindowHandle(window);
+        WindowId windowId = Win32Interop.GetWindowIdFromWindow(hWnd);
+        AppWindow appWindow = AppWindow.GetFromWindowId(windowId);
+        (SizeInt32 preferred, SizeInt32 minimum) = CalculateSizes(window);
+
+        if (appWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.PreferredMinimumWidth = minimum.Width;
+            presenter.PreferredMinimumHeight = minimum.Height;
+            if (presenter.State == OverlappedPresenterState.Maximized)
+            {
+                return;
+            }
+        }
+
+        appWindow.Resize(preferred);
+    }
+
+    public static void ApplyUserScalePercent(int percent)
+    {
+        UserScale = percent switch
+        {
+            110 => 1.10,
+            125 => 1.25,
+            _ => 1.0
+        };
+    }
+
+    private static (SizeInt32 Preferred, SizeInt32 Minimum) CalculateSizes(Window window)
     {
         IntPtr hWnd = WindowNative.GetWindowHandle(window);
         WindowId windowId = Win32Interop.GetWindowIdFromWindow(hWnd);
@@ -36,39 +73,15 @@ internal static class DisplayLayoutHelper
 
         scale = Math.Clamp(scale, 1.0, 2.5) * Math.Clamp(UserScale, 1.0, 1.25);
 
-        int width = (int)Math.Round(BaseWidth * scale);
-        int height = (int)Math.Round(BaseHeight * scale);
+        int maxWidth = workArea.Width - (int)Math.Round(32 * scale);
+        int maxHeight = workArea.Height - (int)Math.Round(32 * scale);
 
-        int horizontalMargin = (int)Math.Round(48 * scale);
-        int verticalMargin = (int)Math.Round(56 * scale);
+        int minWidth = Math.Min((int)Math.Round(MinimumWidth * scale), maxWidth);
+        int minHeight = Math.Min((int)Math.Round(MinimumHeight * scale), maxHeight);
 
-        int maxWidth = Math.Max((int)Math.Round(600 * scale), workArea.Width - horizontalMargin);
-        int maxHeight = Math.Max((int)Math.Round(520 * scale), workArea.Height - verticalMargin);
+        int width = Math.Clamp((int)Math.Round(BaseWidth * scale), minWidth, Math.Max(minWidth, maxWidth));
+        int height = Math.Clamp((int)Math.Round(BaseHeight * scale), minHeight, Math.Max(minHeight, maxHeight));
 
-        int minWidth = (int)Math.Round(660 * scale);
-        int minHeight = (int)Math.Round(600 * scale);
-
-        width = Math.Clamp(width, Math.Min(minWidth, maxWidth), maxWidth);
-        height = Math.Clamp(height, Math.Min(minHeight, maxHeight), maxHeight);
-
-        return new SizeInt32(width, height);
-    }
-
-    public static void ApplyWindowSize(Window window)
-    {
-        IntPtr hWnd = WindowNative.GetWindowHandle(window);
-        WindowId windowId = Win32Interop.GetWindowIdFromWindow(hWnd);
-        AppWindow appWindow = AppWindow.GetFromWindowId(windowId);
-        appWindow.Resize(CalculateWindowSize(window));
-    }
-
-    public static void ApplyUserScalePercent(int percent)
-    {
-        UserScale = percent switch
-        {
-            110 => 1.10,
-            125 => 1.25,
-            _ => 1.0
-        };
+        return (new SizeInt32(width, height), new SizeInt32(minWidth, minHeight));
     }
 }

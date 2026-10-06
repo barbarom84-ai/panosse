@@ -62,6 +62,8 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     private readonly IUpdateService updateService;
     private readonly IUpdateOrchestrator updateOrchestrator;
     private readonly IDiagnosticsService diagnosticsService;
+    private readonly IRegistryCleanerService registryCleaner;
+    private string registryBackupStatus = string.Empty;
     private const string GithubRepo = "barbarom84-ai/panosse";
     private static readonly TimeSpan MinimumCleanupDuration = TimeSpan.FromSeconds(1.5);
 
@@ -75,6 +77,11 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     /// </summary>
     public Func<string, Task<bool>>? ConfirmCleanupAsync { get; set; }
 
+    /// <summary>
+    /// Optional generic confirmation (title, message, primary button text). Return false to cancel.
+    /// </summary>
+    public Func<string, string, string, Task<bool>>? ConfirmActionAsync { get; set; }
+
     public ShellViewModel(
         ICleanupOrchestrator cleanupOrchestrator,
         ILoggerService loggerService,
@@ -82,9 +89,11 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         IOperationHistoryService historyService,
         IUpdateService updateService,
         IUpdateOrchestrator updateOrchestrator,
-        IDiagnosticsService diagnosticsService)
+        IDiagnosticsService diagnosticsService,
+        IRegistryCleanerService registryCleaner)
     {
         this.cleanupOrchestrator = cleanupOrchestrator;
+        this.registryCleaner = registryCleaner;
         this.loggerService = loggerService;
         this.settingsService = settingsService;
         this.historyService = historyService;
@@ -125,12 +134,18 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             execute: ExecuteInstallPreparedUpdate,
             canExecute: () => !string.IsNullOrWhiteSpace(preparedScriptPath) && !IsPreparingUpdate);
         OpenLogsCommand = new RelayCommand(OpenLogsFolder);
+        RestoreRegistryBackupCommand = new AsyncRelayCommand(
+            executeAsync: RestoreLatestRegistryBackupAsync,
+            canExecute: () => !IsBusy,
+            onException: ex => loggerService.LogError("winui-registry", "Registry restore failed.", ex));
+        OpenRegistryBackupsCommand = new RelayCommand(OpenRegistryBackupsFolder);
 
         TaskMessages.CollectionChanged += OnTaskMessagesCollectionChanged;
         HistoryItems.CollectionChanged += OnHistoryItemsCollectionChanged;
 
         LoadSettings();
         RefreshHistory();
+        RefreshRegistryBackupStatus();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -153,6 +168,14 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     public ICommand PrepareUpdateCommand { get; }
     public ICommand InstallPreparedUpdateCommand { get; }
     public ICommand OpenLogsCommand { get; }
+    public ICommand RestoreRegistryBackupCommand { get; }
+    public ICommand OpenRegistryBackupsCommand { get; }
+
+    public string RegistryBackupStatus
+    {
+        get => registryBackupStatus;
+        private set => SetField(ref registryBackupStatus, value);
+    }
 
     public string StatusText
     {
@@ -189,6 +212,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
                 (RunPreviewCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 (ConfirmCleanupFromPreviewCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 (CancelCleanupCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                (RestoreRegistryBackupCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsProgressVisible)));
             }
         }
@@ -559,6 +583,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
                 PreviewItems.Clear();
                 HasPreviewResults = false;
                 PreviewRiskSummary = string.Empty;
+                RefreshRegistryBackupStatus();
             }
 
             RefreshHistory();
@@ -633,7 +658,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         string message = $"Lancer le nettoyage ({profileName}) ?\n{CleanupProfiles.GetDescription(CleanupProfile)}";
         if (CleanupProfiles.Normalize(CleanupProfile) == CleanupProfiles.Deep)
         {
-            message += "\n\nAttention : le mode Profond inclut registre, téléchargements anciens et logs — certaines actions sont difficilement réversibles.";
+            message += "\n\nAttention : le mode Profond inclut les entrées registre système (désinstallations orphelines, DLL partagées), les téléchargements anciens et les logs. Le registre est sauvegardé automatiquement avant toute modification ; les fichiers supprimés ne sont pas récupérables.";
         }
 
         return message;
@@ -667,10 +692,10 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         bool hasHighRisk = false;
 
         foreach (CleanupPreviewItem item in items
-                     .Where(i => i.EstimatedBytes > 0 || string.Equals(i.RiskLevel, "High", StringComparison.OrdinalIgnoreCase))
-                     .OrderByDescending(i => i.EstimatedBytes))
+                     .Where(i => i.EstimatedBytes > 0 || i.ItemCount > 0 || string.Equals(i.RiskLevel, "High", StringComparison.OrdinalIgnoreCase))
+                     .OrderByDescending(i => i.EstimatedBytes)
+                     .ThenByDescending(i => i.ItemCount))
         {
-            double mb = Math.Round(item.EstimatedBytes / 1024.0 / 1024.0, 2);
             string risk = FormatRiskLevel(item.RiskLevel);
             if (string.Equals(item.RiskLevel, "High", StringComparison.OrdinalIgnoreCase))
             {
@@ -681,7 +706,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
                 hasMediumRisk = true;
             }
 
-            PreviewItems.Add($"{item.Category} : {mb} Mo · risque {risk}");
+            PreviewItems.Add(FormatPreviewLine(item, risk));
         }
 
         if (PreviewItems.Count == 0)
@@ -691,10 +716,86 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
 
         HasPreviewResults = PreviewItems.Count > 0;
         PreviewRiskSummary = hasHighRisk
-            ? "Attention (Profond) : registre, téléchargements ou logs à risque élevé."
+            ? "Attention (Profond) : téléchargements, logs ou pilotes à risque élevé. Le registre est sauvegardé avant modification."
             : hasMediumRisk
-                ? "Attention : certaines catégories (ex. téléchargements) ont un risque moyen."
+                ? "Attention : certaines catégories (téléchargements, registre système…) ont un risque moyen. Le registre est sauvegardé avant modification."
                 : $"Profil {CleanupProfiles.GetDisplayName(CleanupProfile)} — risque faible pour les catégories listées.";
+    }
+
+    internal static string FormatPreviewLine(CleanupPreviewItem item, string risk)
+    {
+        if (item.ItemCount > 0 && item.EstimatedBytes == 0)
+        {
+            string details = string.IsNullOrWhiteSpace(item.Location) ? string.Empty : $" ({item.Location})";
+            return $"{item.Category} : {item.ItemCount} entrée(s){details} · risque {risk}";
+        }
+
+        double mb = Math.Round(item.EstimatedBytes / 1024.0 / 1024.0, 2);
+        return $"{item.Category} : {mb} Mo · risque {risk}";
+    }
+
+    private void RefreshRegistryBackupStatus()
+    {
+        string? latest = registryCleaner.GetLatestBackupPath();
+        RegistryBackupStatus = latest is null
+            ? "Aucune sauvegarde du registre pour l'instant. Panosse en crée une automatiquement avant chaque nettoyage du registre."
+            : $"Dernière sauvegarde : {Path.GetFileName(latest)} ({File.GetLastWriteTime(latest):dd/MM/yyyy HH:mm})";
+    }
+
+    private async Task RestoreLatestRegistryBackupAsync()
+    {
+        string? latest = registryCleaner.GetLatestBackupPath();
+        if (latest is null)
+        {
+            StatusText = "Aucune sauvegarde du registre à restaurer.";
+            return;
+        }
+
+        if (ConfirmActionAsync is not null &&
+            !await ConfirmActionAsync(
+                "Restaurer le registre",
+                $"Restaurer le registre depuis la sauvegarde du {File.GetLastWriteTime(latest):dd/MM/yyyy à HH:mm} ?\nLes entrées supprimées lors de ce nettoyage seront recréées.",
+                "Restaurer"))
+        {
+            StatusText = "Restauration annulée.";
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            (bool restored, string message) = await Task.Run(() =>
+            {
+                bool ok = registryCleaner.TryRestoreBackup(latest, out string result);
+                return (ok, result);
+            });
+
+            IsSuccessStatus = restored;
+            StatusText = message;
+            AddTaskMessage(restored ? $"✅ {message}" : $"❌ {message}");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void OpenRegistryBackupsFolder()
+    {
+        try
+        {
+            Directory.CreateDirectory(registryCleaner.BackupDirectory);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = registryCleaner.BackupDirectory,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            loggerService.LogError("winui-registry", "Failed to open registry backups folder.", ex);
+            StatusText = "Impossible d'ouvrir le dossier des sauvegardes du registre.";
+        }
     }
 
     private static string FormatRiskLevel(string riskLevel) =>

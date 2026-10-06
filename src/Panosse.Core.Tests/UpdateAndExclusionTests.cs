@@ -75,6 +75,19 @@ public class CleanupProfileTests
         Assert.False(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, CleanupProfiles.CategoryDownloads));
         Assert.False(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, CleanupProfiles.CategoryRegistry));
         Assert.False(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, CleanupProfiles.CategoryLogs));
+        Assert.False(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, CleanupProfiles.CategoryDefender));
+        Assert.False(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, CleanupProfiles.CategoryDrivers));
+    }
+
+    [Fact]
+    public void Standard_IncludesSystemCaches_ButNotDrivers()
+    {
+        Assert.True(CleanupProfiles.IncludesCategory(CleanupProfiles.Standard, CleanupProfiles.CategoryInetCache));
+        Assert.True(CleanupProfiles.IncludesCategory(CleanupProfiles.Standard, CleanupProfiles.CategoryDeliveryOptimization));
+        Assert.True(CleanupProfiles.IncludesCategory(CleanupProfiles.Standard, CleanupProfiles.CategoryErrorReports));
+        Assert.True(CleanupProfiles.IncludesCategory(CleanupProfiles.Standard, CleanupProfiles.CategoryDefender));
+        Assert.False(CleanupProfiles.IncludesCategory(CleanupProfiles.Standard, CleanupProfiles.CategoryDrivers));
+        Assert.True(CleanupProfiles.IncludesCategory(CleanupProfiles.Deep, CleanupProfiles.CategoryDrivers));
     }
 
     [Fact]
@@ -83,8 +96,12 @@ public class CleanupProfileTests
         Assert.Equal("High", CleanupProfiles.GetRiskLevel(CleanupProfiles.Deep, CleanupProfiles.CategoryRegistry));
         Assert.Equal("High", CleanupProfiles.GetRiskLevel(CleanupProfiles.Deep, CleanupProfiles.CategoryDownloads));
         Assert.Equal("High", CleanupProfiles.GetRiskLevel(CleanupProfiles.Deep, CleanupProfiles.CategoryLogs));
+        Assert.Equal("High", CleanupProfiles.GetRiskLevel(CleanupProfiles.Deep, CleanupProfiles.CategoryDefender));
+        Assert.Equal("High", CleanupProfiles.GetRiskLevel(CleanupProfiles.Standard, CleanupProfiles.CategoryDrivers));
         Assert.Equal("Medium", CleanupProfiles.GetRiskLevel(CleanupProfiles.Standard, CleanupProfiles.CategoryDownloads));
+        Assert.Equal("Medium", CleanupProfiles.GetRiskLevel(CleanupProfiles.Standard, CleanupProfiles.CategoryDefender));
         Assert.Equal("Low", CleanupProfiles.GetRiskLevel(CleanupProfiles.Standard, CleanupProfiles.CategoryLogs));
+        Assert.Equal("Low", CleanupProfiles.GetRiskLevel(CleanupProfiles.Standard, CleanupProfiles.CategoryDeliveryOptimization));
     }
 
     [Fact]

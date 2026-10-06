@@ -12,17 +12,20 @@ namespace Panosse.Services;
 public sealed class CleanupOrchestrator : ICleanupOrchestrator
 {
     private readonly ICleanupService cleanupService;
+    private readonly IRegistryCleanerService registryCleaner;
     private readonly ITelemetryService telemetryService;
     private readonly IOperationHistoryService historyService;
     private readonly ILoggerService logger;
 
     public CleanupOrchestrator(
         ICleanupService cleanupService,
+        IRegistryCleanerService registryCleaner,
         ITelemetryService telemetryService,
         IOperationHistoryService historyService,
         ILoggerService logger)
     {
         this.cleanupService = cleanupService;
+        this.registryCleaner = registryCleaner;
         this.telemetryService = telemetryService;
         this.historyService = historyService;
         this.logger = logger;
@@ -53,20 +56,46 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             @"Mozilla\Firefox\Profiles");
         string thumbnails = Path.Combine(localAppData, @"Microsoft\Windows\Explorer");
+        string inetCache = Path.Combine(localAppData, @"Microsoft\Windows\INetCache");
+        string deliveryCache = @"C:\Windows\SoftwareDistribution\DeliveryOptimization\Cache";
+        string werQueue = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            @"Microsoft\Windows\WER\ReportQueue");
+        string defenderHistory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            @"Microsoft\Windows Defender\Scans\History");
+        string driverStoreTemp = @"C:\Windows\System32\DriverStore\Temp";
+        int registryIssueCount = 0;
+        RegistryCleanResult? registryResult = null;
 
         var steps = new List<(string Category, string Start, Func<CancellationToken, Task<long>> Action, Func<long, string> End)>
         {
             (CleanupProfiles.CategoryRecycle, "🗑️ Vidage de la corbeille...", ct => RunOrEstimateAsync(preview, () => { cleanupService.EmptyRecycleBinAsync().GetAwaiter().GetResult(); return 0L; }, 0), _ => "✅ Corbeille traitée"),
             (CleanupProfiles.CategoryTemp, "🧹 Nettoyage des fichiers temporaires...", _ => RunOrEstimateAsync(preview, cleanupService.CleanTemporaryFiles, EstimateDirectoryBytes(tempPath) + EstimateDirectoryBytes(windowsTemp)), b => $"✅ Fichiers temporaires traités ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryInetCache, "🌐 Nettoyage des fichiers Internet temporaires...", _ => RunOrEstimateAsync(preview, cleanupService.CleanTemporaryInternetFiles, EstimateDirectoryBytes(inetCache)), b => $"✅ Internet temporaire traité ({ToMb(b)} Mo)"),
             (CleanupProfiles.CategoryBrowser, "🌐 Nettoyage du cache Chrome...", _ => RunOrEstimateAsync(preview, cleanupService.CleanChromeCache, EstimateDirectoryBytes(chromeCache)), b => $"✅ Cache Chrome traité ({ToMb(b)} Mo)"),
             (CleanupProfiles.CategoryBrowser, "🌐 Nettoyage du cache Edge...", _ => RunOrEstimateAsync(preview, cleanupService.CleanEdgeCache, EstimateDirectoryBytes(edgeCache)), b => $"✅ Cache Edge traité ({ToMb(b)} Mo)"),
             (CleanupProfiles.CategoryBrowser, "🌐 Nettoyage du cache Firefox...", _ => RunOrEstimateAsync(preview, cleanupService.CleanFirefoxCache, EstimateFirefoxCacheBytes(firefoxProfiles)), b => $"✅ Cache Firefox traité ({ToMb(b)} Mo)"),
             (CleanupProfiles.CategoryBrowser, "🌐 Nettoyage du cache Opera...", _ => RunOrEstimateAsync(preview, cleanupService.CleanOperaCache, 0), b => $"✅ Cache Opera traité ({ToMb(b)} Mo)"),
             (CleanupProfiles.CategoryBrowser, "🌐 Nettoyage du cache Brave...", _ => RunOrEstimateAsync(preview, cleanupService.CleanBraveCache, 0), b => $"✅ Cache Brave traité ({ToMb(b)} Mo)"),
             (CleanupProfiles.CategoryBrowser, "🌐 Nettoyage du cache Vivaldi...", _ => RunOrEstimateAsync(preview, cleanupService.CleanVivaldiCache, 0), b => $"✅ Cache Vivaldi traité ({ToMb(b)} Mo)"),
-            (CleanupProfiles.CategoryRegistry, "📋 Nettoyage du registre...", _ => RunOrEstimateAsync(preview, () => { cleanupService.CleanRegistry(); return 0L; }, 0), _ => "✅ Registre traité"),
+            (CleanupProfiles.CategoryDeliveryOptimization, "📦 Nettoyage Delivery Optimization...", _ => RunOrEstimateAsync(preview, cleanupService.CleanDeliveryOptimization, EstimateDirectoryBytes(deliveryCache)), b => $"✅ Delivery Optimization traité ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryErrorReports, "🩹 Nettoyage des rapports d'erreurs Windows...", _ => RunOrEstimateAsync(preview, cleanupService.CleanWindowsErrorReports, EstimateDirectoryBytes(werQueue)), b => $"✅ Rapports d'erreurs traités ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryDefender, "🛡️ Nettoyage Microsoft Defender...", _ => RunOrEstimateAsync(preview, cleanupService.CleanDefenderArtifacts, EstimateDirectoryBytes(defenderHistory)), b => $"✅ Microsoft Defender traité ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryDrivers, "💾 Nettoyage des composants Windows remplacés (DISM)...", _ => RunOrEstimateAsync(preview, cleanupService.CleanObsoleteDriverPackages, EstimateDirectoryBytes(driverStoreTemp)), b => $"✅ Composants Windows traités ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryRegistry, "📋 Analyse du registre...", ct => Task.Run(() =>
+            {
+                IReadOnlyList<RegistryIssue> issues = registryCleaner.Scan(profile, options.ExclusionPatterns, ct);
+                registryIssueCount = issues.Count;
+                if (!preview)
+                {
+                    registryResult = registryCleaner.Clean(issues, ct);
+                }
+
+                return 0L;
+            }, ct), _ => FormatRegistryStepMessage(preview, registryIssueCount, registryResult)),
             (CleanupProfiles.CategoryDownloads, "📥 Nettoyage des téléchargements anciens...", _ => RunOrEstimateAsync(preview, () => cleanupService.CleanOldDownloads(options.ExclusionPatterns), EstimateOldDownloads(options.ExclusionPatterns)), b => $"✅ Téléchargements traités ({ToMb(b)} Mo)"),
-            (CleanupProfiles.CategoryLogs, "📄 Nettoyage des logs Windows...", _ => RunOrEstimateAsync(preview, cleanupService.CleanWindowsLogs, EstimateDirectoryBytes(@"C:\Windows\Logs")), b => $"✅ Logs Windows traités ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryLogs, "📄 Nettoyage des logs Windows...", _ => RunOrEstimateAsync(preview, cleanupService.CleanWindowsLogs, EstimateDirectoryBytes(@"C:\Windows\Logs") + EstimateDirectoryBytes(@"C:\Windows\System32\LogFiles")), b => $"✅ Logs Windows traités ({ToMb(b)} Mo)"),
             (CleanupProfiles.CategoryThumbnails, "🖼️ Nettoyage du cache des miniatures...", _ => RunOrEstimateAsync(preview, cleanupService.CleanThumbnailCache, EstimateThumbnailBytes(thumbnails)), b => $"✅ Cache miniatures traité ({ToMb(b)} Mo)")
         };
 
@@ -203,6 +232,31 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
 
     private static double ToMb(long bytes) => Math.Round(bytes / 1024.0 / 1024.0, 2);
 
+    internal static string FormatRegistryStepMessage(bool preview, int issueCount, RegistryCleanResult? result)
+    {
+        if (preview)
+        {
+            return issueCount == 0
+                ? "✅ Registre : aucune entrée invalide détectée"
+                : $"✅ Registre : {issueCount} entrée(s) à nettoyer détectée(s)";
+        }
+
+        if (result is null || issueCount == 0)
+        {
+            return "✅ Registre : aucune entrée invalide détectée";
+        }
+
+        string message = $"✅ Registre : {result.RemovedCount} entrée(s) nettoyée(s)";
+        if (result.SkippedCount > 0)
+        {
+            message += $", {result.SkippedCount} ignorée(s)";
+        }
+
+        return result.BackupPath is null
+            ? message
+            : $"{message} · sauvegarde {Path.GetFileName(result.BackupPath)}";
+    }
+
     private List<CleanupPreviewItem> BuildPreviewItems(List<string> exclusionPatterns, string profile)
     {
         string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -217,10 +271,15 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
             @"Mozilla\Firefox\Profiles");
         string thumbnails = Path.Combine(localAppData, @"Microsoft\Windows\Explorer");
         string logsPath = @"C:\Windows\Logs";
-
-        long browserBytes = EstimateDirectoryBytes(chromeCache)
-            + EstimateDirectoryBytes(edgeCache)
-            + EstimateFirefoxCacheBytes(firefoxProfiles);
+        string inetCache = Path.Combine(localAppData, @"Microsoft\Windows\INetCache");
+        string deliveryCache = @"C:\Windows\SoftwareDistribution\DeliveryOptimization\Cache";
+        string werRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            @"Microsoft\Windows\WER");
+        string defenderHistory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            @"Microsoft\Windows Defender\Scans\History");
+        string driverStoreTemp = @"C:\Windows\System32\DriverStore\Temp";
 
         var items = new List<(string CategoryKey, CleanupPreviewItem Item)>
         {
@@ -231,12 +290,61 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
                 EstimatedBytes = EstimateDirectoryBytes(tempPath) + EstimateDirectoryBytes(windowsTemp),
                 RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryTemp)
             }),
+            (CleanupProfiles.CategoryInetCache, new CleanupPreviewItem
+            {
+                Category = "Fichiers Internet temporaires",
+                Location = inetCache,
+                EstimatedBytes = EstimateDirectoryBytes(inetCache),
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryInetCache)
+            }),
             (CleanupProfiles.CategoryBrowser, new CleanupPreviewItem
             {
-                Category = "Caches navigateurs",
-                Location = localAppData,
-                EstimatedBytes = browserBytes,
+                Category = "Cache Chrome",
+                Location = chromeCache,
+                EstimatedBytes = EstimateDirectoryBytes(chromeCache),
                 RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryBrowser)
+            }),
+            (CleanupProfiles.CategoryBrowser, new CleanupPreviewItem
+            {
+                Category = "Cache Edge",
+                Location = edgeCache,
+                EstimatedBytes = EstimateDirectoryBytes(edgeCache),
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryBrowser)
+            }),
+            (CleanupProfiles.CategoryBrowser, new CleanupPreviewItem
+            {
+                Category = "Cache Firefox",
+                Location = firefoxProfiles,
+                EstimatedBytes = EstimateFirefoxCacheBytes(firefoxProfiles),
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryBrowser)
+            }),
+            (CleanupProfiles.CategoryDeliveryOptimization, new CleanupPreviewItem
+            {
+                Category = "Delivery Optimization",
+                Location = deliveryCache,
+                EstimatedBytes = EstimateDirectoryBytes(deliveryCache),
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryDeliveryOptimization)
+            }),
+            (CleanupProfiles.CategoryErrorReports, new CleanupPreviewItem
+            {
+                Category = "Rapports d'erreurs Windows",
+                Location = werRoot,
+                EstimatedBytes = EstimateDirectoryBytes(werRoot),
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryErrorReports)
+            }),
+            (CleanupProfiles.CategoryDefender, new CleanupPreviewItem
+            {
+                Category = "Microsoft Defender",
+                Location = defenderHistory,
+                EstimatedBytes = EstimateDirectoryBytes(defenderHistory),
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryDefender)
+            }),
+            (CleanupProfiles.CategoryDrivers, new CleanupPreviewItem
+            {
+                Category = "Composants Windows remplacés (DISM)",
+                Location = @"C:\Windows\System32\DriverStore",
+                EstimatedBytes = EstimateDirectoryBytes(driverStoreTemp),
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryDrivers)
             }),
             (CleanupProfiles.CategoryDownloads, new CleanupPreviewItem
             {
@@ -249,7 +357,7 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
             {
                 Category = "Logs Windows",
                 Location = logsPath,
-                EstimatedBytes = EstimateDirectoryBytes(logsPath),
+                EstimatedBytes = EstimateDirectoryBytes(logsPath) + EstimateDirectoryBytes(@"C:\Windows\System32\LogFiles"),
                 RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryLogs)
             }),
             (CleanupProfiles.CategoryThumbnails, new CleanupPreviewItem
@@ -258,15 +366,24 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
                 Location = thumbnails,
                 EstimatedBytes = EstimateThumbnailBytes(thumbnails),
                 RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryThumbnails)
-            }),
-            (CleanupProfiles.CategoryRegistry, new CleanupPreviewItem
-            {
-                Category = "Registre",
-                Location = "HKCU",
-                EstimatedBytes = 0,
-                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryRegistry)
             })
         };
+
+        if (CleanupProfiles.IncludesCategory(profile, CleanupProfiles.CategoryRegistry))
+        {
+            IEnumerable<CleanupPreviewItem> registryItems = registryCleaner
+                .Scan(profile, exclusionPatterns)
+                .GroupBy(issue => issue.Category)
+                .Select(group => new CleanupPreviewItem
+                {
+                    Category = $"Registre · {RegistryIssueCategories.GetLabel(group.Key)}",
+                    Location = string.Join(" | ", group.Select(i => i.Description).Distinct().Take(3)),
+                    ItemCount = group.Count(),
+                    RiskLevel = group.Any(i => i.RiskLevel == "Medium") ? "Medium" : "Low"
+                });
+
+            items.AddRange(registryItems.Select(item => (CleanupProfiles.CategoryRegistry, item)));
+        }
 
         return items
             .Where(entry => CleanupProfiles.IncludesCategory(profile, entry.CategoryKey))

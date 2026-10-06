@@ -29,6 +29,22 @@ public sealed class DiagnosticsService : IDiagnosticsService
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     @"Microsoft\Edge\User Data\Default\Cache"),
                 optionalMissing: true),
+            CheckPathAccess(
+                "INetCache",
+                Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    @"Microsoft\Windows\INetCache"),
+                optionalMissing: true),
+            CheckPathAccess(
+                "Delivery Optimization",
+                @"C:\Windows\SoftwareDistribution\DeliveryOptimization\Cache",
+                optionalMissing: true),
+            CheckPathAccess(
+                "WER ReportQueue",
+                Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    @"Microsoft\Windows\WER\ReportQueue"),
+                optionalMissing: true),
             CheckAppData()
         };
 

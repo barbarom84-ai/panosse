@@ -10,6 +10,7 @@ internal sealed class SingleInstanceCoordinator : IDisposable
 {
     private const string MutexName = "Panosse_Unique_Mutex_99";
     private const string ActivateEventName = "Local\\Panosse_ActivateWindow";
+    public const string ElevatedRestartArgument = "--elevated-restart";
 
     private readonly Mutex mutex;
     private readonly EventWaitHandle activateEvent;
@@ -28,16 +29,51 @@ internal sealed class SingleInstanceCoordinator : IDisposable
     /// </summary>
     public static bool TryClaimPrimary(out SingleInstanceCoordinator? coordinator)
     {
-        var mutex = new Mutex(true, MutexName, out bool createdNew);
-        if (!createdNew)
+        coordinator = null;
+        bool isElevatedRestart = Environment.GetCommandLineArgs()
+            .Any(arg => arg.Equals(ElevatedRestartArgument, StringComparison.OrdinalIgnoreCase));
+
+        Mutex mutex;
+        try
         {
-            mutex.Dispose();
+            mutex = new Mutex(false, MutexName);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Mutex créé par une instance administrateur : inaccessible depuis une instance standard.
             SignalExistingInstance();
-            coordinator = null;
             return false;
         }
 
-        var activateEvent = new EventWaitHandle(false, EventResetMode.ManualReset, ActivateEventName);
+        bool acquired;
+        try
+        {
+            // Après une relance élevée, l'instance précédente libère le mutex en quittant.
+            acquired = mutex.WaitOne(isElevatedRestart ? TimeSpan.FromSeconds(15) : TimeSpan.Zero);
+        }
+        catch (AbandonedMutexException)
+        {
+            acquired = true;
+        }
+
+        if (!acquired)
+        {
+            mutex.Dispose();
+            SignalExistingInstance();
+            return false;
+        }
+
+        EventWaitHandle activateEvent;
+        try
+        {
+            activateEvent = new EventWaitHandle(false, EventResetMode.ManualReset, ActivateEventName);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Événement laissé par une ancienne instance d'un autre niveau de droits : activation inter-instances indisponible.
+            activateEvent = new EventWaitHandle(false, EventResetMode.ManualReset);
+        }
+
         coordinator = new SingleInstanceCoordinator(mutex, activateEvent);
         return true;
     }

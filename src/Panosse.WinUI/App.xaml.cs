@@ -54,12 +54,12 @@ namespace Panosse.WinUI
             ApplyWindowIcon(appWindow);
             
             // Taille initiale ; affinée après le premier rendu (DPI + zone de travail).
-            appWindow.Resize(new Windows.Graphics.SizeInt32 { Width = 720, Height = 680 });
+            appWindow.Resize(new Windows.Graphics.SizeInt32 { Width = 1060, Height = 820 });
             
             if (appWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
             {
-                presenter.IsResizable = false;
-                presenter.IsMaximizable = false;
+                presenter.IsResizable = true;
+                presenter.IsMaximizable = true;
             }
 
             appWindow.Closing += (_, args) =>
@@ -126,6 +126,10 @@ namespace Panosse.WinUI
             services.AddSingleton<IOperationHistoryService, OperationHistoryService>();
             services.AddSingleton<ISettingsService, SettingsService>();
             services.AddSingleton<ICleanupService, CleanupService>();
+            services.AddSingleton<IRegistryCleanerService, RegistryCleanerService>();
+            services.AddSingleton<IDriverCleanerService, DriverCleanerService>();
+            services.AddSingleton<PendingDriverCleanup>();
+            services.AddSingleton<DriversViewModel>();
             services.AddSingleton<ICleanupOrchestrator, CleanupOrchestrator>();
             services.AddSingleton<IBrowserProcessService, BrowserProcessService>();
             services.AddSingleton<IUpdateService, UpdateService>();
@@ -220,6 +224,36 @@ namespace Panosse.WinUI
                 mainPage.TriggerCleanupFromTray();
                 BringWindowToFront();
             }
+        }
+
+        /// <summary>
+        /// Relance Panosse avec élévation UAC puis quitte l'instance courante.
+        /// Renvoie false si l'utilisateur refuse l'élévation.
+        /// </summary>
+        public bool TryRestartElevated()
+        {
+            string? executable = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(executable))
+            {
+                return false;
+            }
+
+            try
+            {
+                _ = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(executable)
+                {
+                    UseShellExecute = true,
+                    Verb = "runas",
+                    Arguments = SingleInstanceCoordinator.ElevatedRestartArgument
+                });
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                return false;
+            }
+
+            ExitApplication();
+            return true;
         }
 
         private void ExitApplication()

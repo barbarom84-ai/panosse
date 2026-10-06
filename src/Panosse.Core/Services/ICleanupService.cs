@@ -13,8 +13,12 @@ public interface ICleanupService
     long CleanOperaCache();
     long CleanBraveCache();
     long CleanVivaldiCache();
-    void CleanRegistry();
     long CleanOldDownloads(IEnumerable<string>? exclusionPatterns = null);
     long CleanWindowsLogs();
     long CleanThumbnailCache();
+    long CleanTemporaryInternetFiles();
+    long CleanDeliveryOptimization();
+    long CleanWindowsErrorReports();
+    long CleanDefenderArtifacts();
+    long CleanObsoleteDriverPackages();
 }

@@ -18,6 +18,11 @@ public static class CleanupProfiles
     public const string CategoryDownloads = "downloads";
     public const string CategoryLogs = "logs";
     public const string CategoryThumbnails = "thumbnails";
+    public const string CategoryInetCache = "inetcache";
+    public const string CategoryDeliveryOptimization = "delivery";
+    public const string CategoryErrorReports = "wer";
+    public const string CategoryDefender = "defender";
+    public const string CategoryDrivers = "drivers";
 
     public static string Normalize(string? profile)
     {
@@ -44,6 +49,8 @@ public static class CleanupProfiles
         return normalized switch
         {
             Rapid => key is CategoryRecycle or CategoryTemp or CategoryThumbnails,
+            // Paquets pilotes : DISM / risque élevé → profil Profond uniquement.
+            Standard => key is not CategoryDrivers,
             _ => true
         };
     }
@@ -53,13 +60,18 @@ public static class CleanupProfiles
         string normalized = Normalize(profile);
         string key = category?.Trim().ToLowerInvariant() ?? string.Empty;
 
-        if (normalized == Deep &&
-            key is CategoryRegistry or CategoryDownloads or CategoryLogs)
+        if (key is CategoryDrivers)
         {
             return "High";
         }
 
-        if (key is CategoryDownloads)
+        if (normalized == Deep &&
+            key is CategoryRegistry or CategoryDownloads or CategoryLogs or CategoryDefender)
+        {
+            return "High";
+        }
+
+        if (key is CategoryDownloads or CategoryDefender)
         {
             return "Medium";
         }
@@ -79,8 +91,8 @@ public static class CleanupProfiles
         Normalize(profile) switch
         {
             Rapid => "Corbeille, temporaires et miniatures uniquement.",
-            Deep => "Nettoyage complet. Registre, téléchargements et logs : risque élevé.",
-            _ => "Nettoyage complet (navigateurs, logs, téléchargements anciens)."
+            Deep => "Nettoyage complet + registre système (désinstallations orphelines, DLL partagées) et composants Windows remplacés (DISM). Registre sauvegardé avant modification.",
+            _ => "Nettoyage complet (navigateurs, logs, Delivery Optimization, Defender, WER, registre utilisateur sauvegardé…)."
         };
 
     public static int ToIndex(string? profile) =>
