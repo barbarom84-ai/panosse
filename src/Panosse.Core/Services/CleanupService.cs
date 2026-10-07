@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Microsoft.Win32;
 
 namespace Panosse.Services;
 
@@ -373,6 +374,202 @@ public sealed class CleanupService : ICleanupService
         return size;
     }
 
+    public long CleanShaderCaches()
+    {
+        long size = 0;
+        foreach (string path in CleanupPaths.ShaderCacheDirectories())
+        {
+            size += CleanDirectory(path);
+        }
+
+        return size;
+    }
+
+    public long CleanCrashDumps()
+    {
+        long size = CleanDirectory(CleanupPaths.MinidumpDirectory);
+        try
+        {
+            var memoryDump = new FileInfo(CleanupPaths.MemoryDumpFile);
+            if (memoryDump.Exists)
+            {
+                long length = memoryDump.Length;
+                memoryDump.Delete();
+                size += length;
+            }
+        }
+        catch
+        {
+            // Droits administrateur requis.
+        }
+
+        return size;
+    }
+
+    public long CleanWindowsUpdateDownloads()
+    {
+        // Seuil d'âge : ne pas casser une mise à jour en cours de téléchargement / d'installation.
+        DateTime threshold = DateTime.Now.AddDays(-CleanupPaths.WindowsUpdateDownloadMinimumAgeDays);
+        string root = CleanupPaths.WindowsUpdateDownloadDirectory;
+        if (!Directory.Exists(root))
+        {
+            return 0;
+        }
+
+        try
+        {
+            return CleanFilesOlderThan(new DirectoryInfo(root), threshold);
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    public long CleanPreviousWindowsInstallations()
+    {
+        IReadOnlyList<string> directories = CleanupPaths.PreviousWindowsDirectories();
+        if (!directories.Any(Directory.Exists))
+        {
+            return 0;
+        }
+
+        // Windows.old appartient à TrustedInstaller : seul le Nettoyage de disque sait le supprimer proprement.
+        long before = CleanupPaths.EstimateDirectories(directories);
+        if (!RunDiskCleanupHandlers(PreviousWindowsHandlers))
+        {
+            return 0;
+        }
+
+        long after = CleanupPaths.EstimateDirectories(directories);
+        return Math.Max(0, before - after);
+    }
+
+    public long CleanDeveloperCaches()
+    {
+        long size = 0;
+        foreach (string path in CleanupPaths.DeveloperCacheDirectories())
+        {
+            size += CleanDirectory(path);
+        }
+
+        return size;
+    }
+
+    private static readonly string[] PreviousWindowsHandlers = ["Previous Installations", "Temporary Setup Files"];
+    private const int DiskCleanupSageRunId = 4242;
+
+    private static bool RunDiskCleanupHandlers(IReadOnlyCollection<string> handlers)
+    {
+        const string volumeCachesKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches";
+        string stateFlagsValue = $"StateFlags{DiskCleanupSageRunId:D4}";
+        var flaggedHandlers = new List<string>();
+
+        try
+        {
+            foreach (string handler in handlers)
+            {
+                using RegistryKey? key = Registry.LocalMachine.OpenSubKey($@"{volumeCachesKey}\{handler}", writable: true);
+                if (key is null)
+                {
+                    continue;
+                }
+
+                key.SetValue(stateFlagsValue, 2, RegistryValueKind.DWord);
+                flaggedHandlers.Add(handler);
+            }
+
+            if (flaggedHandlers.Count == 0)
+            {
+                return false;
+            }
+
+            string cleanmgrPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cleanmgr.exe");
+            if (!File.Exists(cleanmgrPath))
+            {
+                return false;
+            }
+
+            using Process? process = Process.Start(new ProcessStartInfo
+            {
+                FileName = cleanmgrPath,
+                Arguments = $"/sagerun:{DiskCleanupSageRunId}",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+
+            if (process is null)
+            {
+                return false;
+            }
+
+            if (!process.WaitForExit(milliseconds: 20 * 60 * 1000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                return false;
+            }
+
+            return true;
+        }
+        catch
+        {
+            // Sans droits administrateur, l'écriture dans HKLM échoue.
+            return false;
+        }
+        finally
+        {
+            foreach (string handler in flaggedHandlers)
+            {
+                try
+                {
+                    using RegistryKey? key = Registry.LocalMachine.OpenSubKey($@"{volumeCachesKey}\{handler}", writable: true);
+                    key?.DeleteValue(stateFlagsValue, throwOnMissingValue: false);
+                }
+                catch { }
+            }
+        }
+    }
+
+    private static long CleanFilesOlderThan(DirectoryInfo directory, DateTime threshold)
+    {
+        long deletedSize = 0;
+        foreach (FileInfo file in directory.EnumerateFiles())
+        {
+            try
+            {
+                if (file.LastWriteTime >= threshold)
+                {
+                    continue;
+                }
+
+                long length = file.Length;
+                file.Delete();
+                deletedSize += length;
+            }
+            catch { }
+        }
+
+        foreach (DirectoryInfo subDirectory in directory.EnumerateDirectories())
+        {
+            try
+            {
+                if (subDirectory.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                {
+                    continue;
+                }
+
+                deletedSize += CleanFilesOlderThan(subDirectory, threshold);
+                if (!subDirectory.EnumerateFileSystemInfos().Any())
+                {
+                    subDirectory.Delete();
+                }
+            }
+            catch { }
+        }
+
+        return deletedSize;
+    }
+
     private static long CleanOldLogFiles(string logsPath, int olderThanDays)
     {
         long deletedSize = 0;
@@ -483,6 +680,11 @@ public sealed class CleanupService : ICleanupService
             {
                 try
                 {
+                    if (TryDeleteLink(subDir))
+                    {
+                        continue;
+                    }
+
                     deletedSize += CleanDirectoryRecursive(subDir);
                 }
                 catch { }
@@ -491,6 +693,20 @@ public sealed class CleanupService : ICleanupService
         catch { }
 
         return deletedSize;
+    }
+
+    /// <summary>
+    /// Supprime une jonction / un lien symbolique sans jamais parcourir sa cible.
+    /// </summary>
+    private static bool TryDeleteLink(DirectoryInfo directory)
+    {
+        if (!directory.Attributes.HasFlag(FileAttributes.ReparsePoint))
+        {
+            return false;
+        }
+
+        try { directory.Delete(); } catch { }
+        return true;
     }
 
     private long CleanDirectoryRecursive(DirectoryInfo directory)
@@ -513,6 +729,11 @@ public sealed class CleanupService : ICleanupService
             {
                 try
                 {
+                    if (TryDeleteLink(subDir))
+                    {
+                        continue;
+                    }
+
                     deletedSize += CleanDirectoryRecursive(subDir);
                     subDir.Delete();
                 }

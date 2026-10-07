@@ -51,6 +51,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     private bool isSuccessStatus;
     private bool hasPreviewResults;
     private string previewRiskSummary = string.Empty;
+    private bool hasStorageReport;
     private CancellationTokenSource? cleanupCts;
     private System.Timers.Timer? scheduledCleanupTimer;
     private readonly SemaphoreSlim scheduledCleanupLock = new(1, 1);
@@ -153,6 +154,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     public ObservableCollection<string> TaskMessages { get; } = new();
     public ObservableCollection<string> HistoryItems { get; } = new();
     public ObservableCollection<string> PreviewItems { get; } = new();
+    public ObservableCollection<StorageReportItem> StorageReportItems { get; } = new();
     public ObservableCollection<string> DiagnosticItems { get; } = new();
 
     public ICommand RunCleanupCommand { get; }
@@ -238,6 +240,12 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
     {
         get => previewRiskSummary;
         private set => SetField(ref previewRiskSummary, value);
+    }
+
+    public bool HasStorageReport
+    {
+        get => hasStorageReport;
+        private set => SetField(ref hasStorageReport, value);
     }
 
     public bool IsSuccessStatus
@@ -577,6 +585,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
             if (preview)
             {
                 PopulatePreviewResults(totalMb);
+                await RefreshStorageReportAsync();
             }
             else
             {
@@ -658,7 +667,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
         string message = $"Lancer le nettoyage ({profileName}) ?\n{CleanupProfiles.GetDescription(CleanupProfile)}";
         if (CleanupProfiles.Normalize(CleanupProfile) == CleanupProfiles.Deep)
         {
-            message += "\n\nAttention : le mode Profond inclut les entrées registre système (désinstallations orphelines, DLL partagées), les téléchargements anciens et les logs. Le registre est sauvegardé automatiquement avant toute modification ; les fichiers supprimés ne sont pas récupérables.";
+            message += "\n\nAttention : le mode Profond inclut les entrées registre système (désinstallations orphelines, DLL partagées), les téléchargements anciens, les logs, l'ancienne installation de Windows (plus de retour arrière possible) et les caches développeur (retéléchargés au prochain build). Le registre est sauvegardé automatiquement avant toute modification ; les fichiers supprimés ne sont pas récupérables.";
         }
 
         return message;
@@ -716,10 +725,29 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged, IDisposable
 
         HasPreviewResults = PreviewItems.Count > 0;
         PreviewRiskSummary = hasHighRisk
-            ? "Attention (Profond) : téléchargements, logs ou pilotes à risque élevé. Le registre est sauvegardé avant modification."
+            ? "Attention (Profond) : téléchargements, logs, pilotes ou Windows.old à risque élevé. Le registre est sauvegardé avant modification."
             : hasMediumRisk
                 ? "Attention : certaines catégories (téléchargements, registre système…) ont un risque moyen. Le registre est sauvegardé avant modification."
                 : $"Profil {CleanupProfiles.GetDisplayName(CleanupProfile)} — risque faible pour les catégories listées.";
+    }
+
+    private async Task RefreshStorageReportAsync()
+    {
+        try
+        {
+            IReadOnlyList<StorageReportItem> report = await Task.Run(StorageReport.Build);
+            StorageReportItems.Clear();
+            foreach (StorageReportItem item in report)
+            {
+                StorageReportItems.Add(item);
+            }
+
+            HasStorageReport = StorageReportItems.Count > 0;
+        }
+        catch (Exception ex)
+        {
+            loggerService.LogError("winui-cleanup", "Storage report failed.", ex);
+        }
     }
 
     internal static string FormatPreviewLine(CleanupPreviewItem item, string risk)

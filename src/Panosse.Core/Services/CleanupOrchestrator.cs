@@ -82,7 +82,12 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
             (CleanupProfiles.CategoryDeliveryOptimization, "📦 Nettoyage Delivery Optimization...", _ => RunOrEstimateAsync(preview, cleanupService.CleanDeliveryOptimization, EstimateDirectoryBytes(deliveryCache)), b => $"✅ Delivery Optimization traité ({ToMb(b)} Mo)"),
             (CleanupProfiles.CategoryErrorReports, "🩹 Nettoyage des rapports d'erreurs Windows...", _ => RunOrEstimateAsync(preview, cleanupService.CleanWindowsErrorReports, EstimateDirectoryBytes(werQueue)), b => $"✅ Rapports d'erreurs traités ({ToMb(b)} Mo)"),
             (CleanupProfiles.CategoryDefender, "🛡️ Nettoyage Microsoft Defender...", _ => RunOrEstimateAsync(preview, cleanupService.CleanDefenderArtifacts, EstimateDirectoryBytes(defenderHistory)), b => $"✅ Microsoft Defender traité ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryWindowsUpdate, "🔄 Nettoyage des téléchargements Windows Update...", _ => RunOrEstimateAsync(preview, cleanupService.CleanWindowsUpdateDownloads, EstimateWindowsUpdateBytes()), b => $"✅ Téléchargements Windows Update traités ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryShaders, "🎮 Nettoyage des caches de shaders GPU...", _ => RunOrEstimateAsync(preview, cleanupService.CleanShaderCaches, CleanupPaths.EstimateDirectories(CleanupPaths.ShaderCacheDirectories())), b => $"✅ Caches de shaders traités ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryCrashDumps, "💥 Nettoyage des dumps de plantage...", _ => RunOrEstimateAsync(preview, cleanupService.CleanCrashDumps, EstimateCrashDumpBytes()), b => $"✅ Dumps de plantage traités ({ToMb(b)} Mo)"),
             (CleanupProfiles.CategoryDrivers, "💾 Nettoyage des composants Windows remplacés (DISM)...", _ => RunOrEstimateAsync(preview, cleanupService.CleanObsoleteDriverPackages, EstimateDirectoryBytes(driverStoreTemp)), b => $"✅ Composants Windows traités ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryPreviousWindows, "🪟 Suppression de l'ancienne installation de Windows...", _ => RunOrEstimateAsync(preview, cleanupService.CleanPreviousWindowsInstallations, CleanupPaths.EstimateDirectories(CleanupPaths.PreviousWindowsDirectories())), b => $"✅ Ancienne installation de Windows traitée ({ToMb(b)} Mo)"),
+            (CleanupProfiles.CategoryDevCaches, "🧑‍💻 Nettoyage des caches développeur...", _ => RunOrEstimateAsync(preview, cleanupService.CleanDeveloperCaches, CleanupPaths.EstimateDirectories(CleanupPaths.DeveloperCacheDirectories())), b => $"✅ Caches développeur traités ({ToMb(b)} Mo)"),
             (CleanupProfiles.CategoryRegistry, "📋 Analyse du registre...", ct => Task.Run(() =>
             {
                 IReadOnlyList<RegistryIssue> issues = registryCleaner.Scan(profile, options.ExclusionPatterns, ct);
@@ -339,12 +344,47 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
                 EstimatedBytes = EstimateDirectoryBytes(defenderHistory),
                 RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryDefender)
             }),
+            (CleanupProfiles.CategoryWindowsUpdate, new CleanupPreviewItem
+            {
+                Category = $"Téléchargements Windows Update (> {CleanupPaths.WindowsUpdateDownloadMinimumAgeDays} j)",
+                Location = CleanupPaths.WindowsUpdateDownloadDirectory,
+                EstimatedBytes = EstimateWindowsUpdateBytes(),
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryWindowsUpdate)
+            }),
+            (CleanupProfiles.CategoryShaders, new CleanupPreviewItem
+            {
+                Category = "Caches de shaders GPU",
+                Location = "DirectX, NVIDIA, AMD, Intel",
+                EstimatedBytes = CleanupPaths.EstimateDirectories(CleanupPaths.ShaderCacheDirectories()),
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryShaders)
+            }),
+            (CleanupProfiles.CategoryCrashDumps, new CleanupPreviewItem
+            {
+                Category = "Dumps de plantage",
+                Location = CleanupPaths.MinidumpDirectory,
+                EstimatedBytes = EstimateCrashDumpBytes(),
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryCrashDumps)
+            }),
             (CleanupProfiles.CategoryDrivers, new CleanupPreviewItem
             {
                 Category = "Composants Windows remplacés (DISM)",
                 Location = @"C:\Windows\System32\DriverStore",
                 EstimatedBytes = EstimateDirectoryBytes(driverStoreTemp),
                 RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryDrivers)
+            }),
+            (CleanupProfiles.CategoryPreviousWindows, new CleanupPreviewItem
+            {
+                Category = "Ancienne installation de Windows (retour arrière impossible)",
+                Location = "Windows.old, $WINDOWS.~BT",
+                EstimatedBytes = CleanupPaths.EstimateDirectories(CleanupPaths.PreviousWindowsDirectories()),
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryPreviousWindows)
+            }),
+            (CleanupProfiles.CategoryDevCaches, new CleanupPreviewItem
+            {
+                Category = "Caches développeur (retéléchargés au besoin)",
+                Location = "NuGet, npm, pip, Gradle, Yarn, pnpm",
+                EstimatedBytes = CleanupPaths.EstimateDirectories(CleanupPaths.DeveloperCacheDirectories()),
+                RiskLevel = CleanupProfiles.GetRiskLevel(profile, CleanupProfiles.CategoryDevCaches)
             }),
             (CleanupProfiles.CategoryDownloads, new CleanupPreviewItem
             {
@@ -413,6 +453,14 @@ public sealed class CleanupOrchestrator : ICleanupOrchestrator
             return 0;
         }
     }
+
+    private static long EstimateWindowsUpdateBytes() =>
+        CleanupPaths.EstimateDirectoryBytes(
+            CleanupPaths.WindowsUpdateDownloadDirectory,
+            CleanupPaths.WindowsUpdateDownloadMinimumAgeDays);
+
+    private static long EstimateCrashDumpBytes() =>
+        EstimateDirectoryBytes(CleanupPaths.MinidumpDirectory) + CleanupPaths.GetFileLength(CleanupPaths.MemoryDumpFile);
 
     private static long EstimateFirefoxCacheBytes(string profilesPath)
     {

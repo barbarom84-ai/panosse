@@ -23,6 +23,11 @@ public static class CleanupProfiles
     public const string CategoryErrorReports = "wer";
     public const string CategoryDefender = "defender";
     public const string CategoryDrivers = "drivers";
+    public const string CategoryShaders = "shaders";
+    public const string CategoryCrashDumps = "dumps";
+    public const string CategoryWindowsUpdate = "wudownload";
+    public const string CategoryPreviousWindows = "windowsold";
+    public const string CategoryDevCaches = "devcaches";
 
     public static string Normalize(string? profile)
     {
@@ -49,8 +54,8 @@ public static class CleanupProfiles
         return normalized switch
         {
             Rapid => key is CategoryRecycle or CategoryTemp or CategoryThumbnails,
-            // Paquets pilotes : DISM / risque élevé → profil Profond uniquement.
-            Standard => key is not CategoryDrivers,
+            // DISM, Windows.old (pas de retour arrière) et caches dev (retéléchargement lourd) → Profond uniquement.
+            Standard => key is not (CategoryDrivers or CategoryPreviousWindows or CategoryDevCaches),
             _ => true
         };
     }
@@ -60,9 +65,14 @@ public static class CleanupProfiles
         string normalized = Normalize(profile);
         string key = category?.Trim().ToLowerInvariant() ?? string.Empty;
 
-        if (key is CategoryDrivers)
+        if (key is CategoryDrivers or CategoryPreviousWindows)
         {
             return "High";
+        }
+
+        if (key is CategoryDevCaches)
+        {
+            return "Medium";
         }
 
         if (normalized == Deep &&
@@ -91,8 +101,8 @@ public static class CleanupProfiles
         Normalize(profile) switch
         {
             Rapid => "Corbeille, temporaires et miniatures uniquement.",
-            Deep => "Nettoyage complet + registre système (désinstallations orphelines, DLL partagées) et composants Windows remplacés (DISM). Registre sauvegardé avant modification.",
-            _ => "Nettoyage complet (navigateurs, logs, Delivery Optimization, Defender, WER, registre utilisateur sauvegardé…)."
+            Deep => "Nettoyage complet + registre système, composants Windows remplacés (DISM), ancienne installation de Windows (Windows.old) et caches développeur (NuGet, npm, pip, Gradle…). Registre sauvegardé avant modification.",
+            _ => "Nettoyage complet (navigateurs, logs, Windows Update, shaders GPU, dumps, Defender, WER, registre utilisateur sauvegardé…)."
         };
 
     public static int ToIndex(string? profile) =>

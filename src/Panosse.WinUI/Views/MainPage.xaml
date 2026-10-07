@@ -10,6 +10,7 @@
     xmlns:converters="using:Panosse.WinUI.Converters"
     xmlns:sys="using:System"
     xmlns:vm="using:Panosse.Core.ViewModels"
+    xmlns:services="using:Panosse.Services"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
@@ -448,6 +449,32 @@
                                     Style="{StaticResource PrimaryActionButtonStyle}"
                                     HorizontalAlignment="Left"
                                     Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Carte espace à gérer manuellement (mesuré, jamais supprimé) -->
+                    <Border x:Name="StorageReportCard"
+                            Style="{StaticResource CardBorderStyle}"
+                            Padding="24,16"
+                            VerticalAlignment="Top"
+                            x:Load="{x:Bind ViewModel.HasStorageReport, Mode=OneWay}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Espace à gérer manuellement"
+                                       Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock Text="Panosse ne supprime pas ces éléments (modèles, disques virtuels, réglages système) : voici comment récupérer la place si vous n'en avez plus besoin."
+                                       Style="{StaticResource ItemDetailTextStyle}" />
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.StorageReportItems, Mode=OneWay}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="services:StorageReportItem">
+                                        <StackPanel Spacing="2" Margin="0,6,0,6">
+                                            <TextBlock Text="{x:Bind Title}" Style="{StaticResource ItemTitleTextStyle}" />
+                                            <TextBlock Text="{x:Bind Advice}"
+                                                       Style="{StaticResource ItemDetailTextStyle}"
+                                                       IsTextSelectionEnabled="True" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </StackPanel>
                     </Border>
 

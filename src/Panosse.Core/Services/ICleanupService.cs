@@ -21,4 +21,9 @@ public interface ICleanupService
     long CleanWindowsErrorReports();
     long CleanDefenderArtifacts();
     long CleanObsoleteDriverPackages();
+    long CleanShaderCaches();
+    long CleanCrashDumps();
+    long CleanWindowsUpdateDownloads();
+    long CleanPreviousWindowsInstallations();
+    long CleanDeveloperCaches();
 }

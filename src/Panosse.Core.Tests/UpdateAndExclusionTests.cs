@@ -105,6 +105,27 @@ public class CleanupProfileTests
     }
 
     [Fact]
+    public void NewCategories_FollowProfileBoundaries()
+    {
+        foreach (string category in new[] { CleanupProfiles.CategoryShaders, CleanupProfiles.CategoryCrashDumps, CleanupProfiles.CategoryWindowsUpdate })
+        {
+            Assert.False(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, category));
+            Assert.True(CleanupProfiles.IncludesCategory(CleanupProfiles.Standard, category));
+            Assert.Equal("Low", CleanupProfiles.GetRiskLevel(CleanupProfiles.Standard, category));
+        }
+
+        foreach (string category in new[] { CleanupProfiles.CategoryDevCaches, CleanupProfiles.CategoryPreviousWindows })
+        {
+            Assert.False(CleanupProfiles.IncludesCategory(CleanupProfiles.Rapid, category));
+            Assert.False(CleanupProfiles.IncludesCategory(CleanupProfiles.Standard, category));
+            Assert.True(CleanupProfiles.IncludesCategory(CleanupProfiles.Deep, category));
+        }
+
+        Assert.Equal("Medium", CleanupProfiles.GetRiskLevel(CleanupProfiles.Deep, CleanupProfiles.CategoryDevCaches));
+        Assert.Equal("High", CleanupProfiles.GetRiskLevel(CleanupProfiles.Deep, CleanupProfiles.CategoryPreviousWindows));
+    }
+
+    [Fact]
     public void IndexRoundTrip_IsStable()
     {
         Assert.Equal(0, CleanupProfiles.ToIndex(CleanupProfiles.Rapid));
